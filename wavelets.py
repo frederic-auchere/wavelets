@@ -7,24 +7,20 @@ Created on Mon Dec 10 11:47:33 2018
 """
 
 import cv2
+import copy
 import numpy as np
 from scipy import special
 
+sigma_e = [0.889, 0.200, 0.086, 0.041, 0.020, 0.010, 0.005,
+           0.00280, 0.00135, 0.00085, 0.00029]
+
 
 class ScalingFunction():
-
-    """
-    Expected amplitude of wavelet coefficients in 2D images containing white noise 
-    Must be redefined for each scaling function
-    """    
-    sigma_e = [1]
 
     def __init__(self, name, coefficients, dtype=np.float32):
         self.name = name
         self.coefficients = coefficients(dtype=dtype)
 
-    def get_noise(self, coeffs):
-        return np.median(np.abs(coeffs[0]))/0.6745/self.sigma_e[0]
 
 class Triangle2D(ScalingFunction):
 
@@ -36,13 +32,11 @@ class Triangle2D(ScalingFunction):
 
 class B3spline2D(ScalingFunction):
 
-    sigma_e = [0.889, 0.200, 0.086, 0.041, 0.020, 0.010, 0.005,
-               0.00280, 0.00135, 0.00085, 0.00029]
-
     def __init__(self, dtype=np.float32):
         super().__init__('b3spline2d',
                          b3spline2d,
                          dtype=dtype)
+
 
 class Atrous():
 
@@ -82,39 +76,79 @@ class Atrous():
                                    self.level,
                                    kernel=self.scaling_function.coefficients)
 
-def enhance(*args, dn2photons=None, weights=None, denoise=None, out=None, mrs=None):
+
+#def denoise(img, sigma_s, method='hard', level=3):
+#
+#    sigma_e = [0.889, 0.200, 0.086, 0.041, 0.020, 0.010, 0.005]
+#
+#    if img.ndim == 3:
+#        channels = [0, 1, 2]
+#    else:
+#        channels = [Ellipsis]
+#
+#    if type(sigma_s) is np.ndarray:
+#        if sigma_s.shape != img.shape:
+#            raise ValueError('Wavelets.denoise: noise array must have same diemsnions as img')
+#    else:
+#        sigma_s = np.full(int(1+2*(img.ndim-2)), sigma_s)
+#
+#    recon = np.empty_like(img)
+#    for c in channels:
+#        coeffs = atrous(img[c], level=level)
+#        recon[c] = np.copy(coeffs[level])
+#        for l in range(level):
+#            if method == 'hard':
+#                coeffs[l][np.abs(coeffs[l]) < (3*sigma_s[c]*sigma_e[l])] = 0
+#                recon[c] += coeffs[l]
+#            elif method == 'soft':
+#                coeffs[l] *= special.erf(np.abs(coeffs[l]/(sigma_s[c]*sigma_e[l]))/np.sqrt(2))
+#                recon[c] += coeffs[l]
+#
+#    return recon
+
+
+def get_noise(coeffs):
+    return np.median(np.abs(coeffs[0]))/0.6745/sigma_e[0]
+
+def prepare_params(param, ndims):
+    
+    if ndims == 2:
+        if param is None:
+            l = []
+        elif type(param) is not list:
+            l = [param]
+        else:
+            l = copy.copy(param)
+    else:
+        if type(param) is not list:
+            if param is None:
+                l = [[],]*ndims
+            else:
+                l = [[param],]*ndims
+        else:
+            if len(param) != ndims:
+                raise ValueError("Invalid number of parameters")
+            else:
+                l = []
+                for p in param:
+                    l.append(prepare_params(p, 2))
+                if None in l:
+                    l[l.index(None)] = []
+    return l
+
+def signif(coeff, sigma, noise, sigma_e, soft_threshold=True):
+    if soft_threshold:
+        return special.erf(np.abs(coeff/(sigma*noise*sigma_e))/np.sqrt(2))
+    else:
+        return np.abs(coeff) < (sigma*noise*sigma_e)
+
+def enhance(*args, weights=None, denoise=None, soft_threshold=True, out=None, mrs=None, **kwargs):
     """
     Performs denoising and / or enhancement by modification of wavelet
-    coefficients as described in J.-L. Starck & F. Murtagh, Handbook of
-    Astronomical Data Analysis, Springer-Verlag
-    
-    args: the first parameter is the image to be denoised/enhanced
-          the second parameter, if present, is a noise map. If not present and 
-          dn2photons is None (see below), the
-          noise in the data is estimated using the first scale.
-    dn2photons: conversion coefficient to be applied to compute photon noise
-                from the input data. If no noise map is provided, this can be
-                if the data is shot noise dominated.
-    denoise: list of desoising coefficients, one for each scale to be desnoised.
-             If coefficients are positive, wavelets coefficients at the
-             corresponding scale are preserved if they are greater than 
-             this coefficient times sigma_e, the excpeted amplitude for 
-             white noise.
-             If coefficients are negative, soft threshilding is applied.
-             If coefficients are zero, no denoising is applied.
-    weights: list of weights to apply to each scale during reconstruction.
-             Can be used as an enhancement tool.
-    mrs: returns the multi-resolution support of the image
-    out: output array if specified
+    coefficients
 
-    Example assuming a 2D image in "image.fits" containing values in detected
-    photons with a read noise equivalent to 2 detected photons
-        from astropy.io import fits
-        image = fits.getdata("image.fits")
-        photon_noise = np.sqrt(image)
-        read_noise = 2
-        noise = np.sqrt(read_noise**2 + photon_noise**2)
-        output = enhance(image, noise, denoise=[-3, -3])
+    Denoising is described in J.-L. Starck & F. Murtagh, Handbook of
+    Astronomical Data Analysis, Springer-Verlag
     """
 
     img = args[0]
@@ -127,36 +161,108 @@ def enhance(*args, dn2photons=None, weights=None, denoise=None, out=None, mrs=No
     if out is None:
         out = np.empty_like(img)
 
-    wgt = [] if weights is None else weights
-    dns = [] if denoise is None else denoise
-    # adds 0 to prevent denoising last wavelet plane (smoothed image)
-    dns.extend([0])
-    if len(wgt) < len(dns):
-        wgt.extend([1]*(len(dns) - len(wgt)))
-    elif len(dns) < len(wgt):
-        dns.extend([0]*(len(wgt) - len(dns)))
-
-    kernel = b3spline2d
+    weights = prepare_params(weights, img.ndim)
+    denoise = prepare_params(denoise, img.ndim)
 
     for c in channels:
-        coeffs = atrous(img[c], level=len(wgt)-1)
+
+        dns = denoise if c is Ellipsis else denoise[c]
+        wgt = weights if c is Ellipsis else weights[c]
+
+        # adds 0 to prevent denoising the last wavelet plane (smoothed image)
+        dns.extend([0])
+        if len(wgt) < len(dns):
+            wgt.extend([1]*(len(dns) - len(wgt)))
+        elif len(dns) < len(wgt):
+            dns.extend([0]*(len(wgt) - len(dns)))
+
+        # atrous returns len(wgt)-1+1=len(wgt) coefficients
+        coeffs = atrous(img[c], level=len(wgt)-1, **kwargs)
         if len(args) == 2:
-            sigma_s = args[1][c]
-        elif dn2photons is not None:  # See Murtagh et al. 1995 A&A 112, 179, Eq .12
-            sigma_s =  2*np.sqrt(img*dn2photons + 3/8)    
+            sigma_s = args[1] if c is Ellipsis else args[1][c]
+            # if type(sigma_s) is np.ndarray:
+            #     print(sigma_s.shape, type(args[1]), len(args[1]))
+#            if type(sigma_s) is np.ndarray:
+#                if sigma_s.shape != img.shape:
+#                    raise ValueError('Wavelets.enhance: noise array must '
+#                                     'have same dimensions as img')
         else:
-            sigma_s = kernel.get_noise(coeffs)
-        for coeff, w, d, se in zip(coeffs, wgt, dns, kernel.sigma_e):
+            sigma_s = get_noise(coeffs)
+        for coeff, w, d, se in zip(coeffs, wgt, dns, sigma_e):
             # no denoising of planes with d = 0
-            if d > 0:
-                coeff[np.abs(coeff) < (d*sigma_s*se)] = 0
-            elif d < 0:
-                coeff *= special.erf(np.abs(coeff/(d*sigma_s*se))/np.sqrt(2))
+            if d != 0:
+                s = signif(coeff, d, sigma_s, se, soft_threshold=soft_threshold)
+                if soft_threshold:
+                    coeff *= s#special.erf(np.abs(coeff/(d*sigma_s*se))/np.sqrt(2))
+                else:
+                    coeff[s] = 0#np.abs(coeff) < (d*sigma_s*se)] = 0
             if w != 1:
                 coeff *= w
         coeffs.sum(axis=0, out=out[c])
 
     return out
+
+#def enhance(*args, weights=None, denoise=None, out=None, chroma=0):
+#
+#    sigma_e = [0.889, 0.200, 0.086, 0.041, 0.020, 0.010, 0.005, 0.00280, 0.00135, 0.00085, 0.00029]
+#
+#    img = args[0]
+#
+#    channels = [0, 1, 2] if img.ndim == 3 else [Ellipsis]
+#
+#    if out is None:
+#        out = np.empty_like(img)
+#
+#    wgt = [] if weights is None else weights
+#    dns = [] if denoise is None else denoise
+#    # adds 0 to prevent denoising last wavelet plane (smoothed image)
+#    dns.extend([0])
+#    if len(wgt) < len(dns):
+#        wgt.extend([1]*(len(dns) - len(wgt)))
+#    elif len(dns) < len(wgt):
+#        dns.extend([0]*(len(wgt) - len(dns)))
+#
+#    # Need all planes up front for color noise
+#    if img.ndim == 3:
+#        coeffs = np.empty((3, len(wgt),) + img.shape[1:], dtype=img.dtype)
+#    else:
+#        coeffs = np.empty((len(wgt),) + img.shape, dtype=img.dtype)
+#    for c in channels:
+#        coeffs[c] = atrous(img[c], level=len(wgt)-1)
+#
+#    if len(args) == 2:
+#        sigma_s = args[1]
+#        if type(sigma_s) is np.ndarray:
+#            if sigma_s.shape != img.shape:
+#                raise ValueError('Wavelets.enhance: noise array must '
+#                                 'have same dimensions as img')
+#    else:
+#        sigma_s = [np.median(np.abs(coeff[0]))/0.6745/sigma_e[0] for coeff in coeffs]
+#
+#    for c in channels:
+#        for ic, w, d, se in zip(range(len(wgt)), wgt, dns, sigma_e):
+#            # no denoising of planes with d = 0
+#            if d > 0:
+#                coeffs[c][ic][np.abs(coeffs[c][ic]) < (d*sigma_s[c]*se)] = 0
+#            elif d < 0:
+#                dum = np.ones_like(coeffs[0][0])
+#                for i in channels:
+#                    toto = special.erf(np.abs(coeffs[i][ic]/(d*sigma_s[i]*se))/np.sqrt(2))
+#                    if i == c:
+#                        dum *= toto
+#                    else:
+#                        dum *= 1 - chroma*(1 - toto)
+#                coeffs[c][ic] *= dum
+##            if c == 0 and ic == 2 and weights is None:
+##                plt.imshow(coeffs[c][ic], vmax=2)
+#            if w != 1:
+#                coeffs[c][ic] *= w
+#        if c == 0 and weights is None:
+#            plt.imshow(coeffs[c][0] + coeffs[c][1] + coeffs[c][2], vmax=2)
+#        coeffs[c].sum(axis=0, out=out[c])
+#
+#    return out
+
 
 def triangle2d(dtype=np.float32):
 
@@ -313,7 +419,7 @@ def atrous(arr, level, kernel=None, recursive_threshold=3):
                          recursive_threshold = level+1
     """
 
-    # If (by default) 3 scales or more, the recursive algorithm is faster
+    # If (by default) 3 scales or more, the recursive algorithm is faster?
     if level >= recursive_threshold:
         return atrous_recursive(arr, level, kernel=kernel)
     else:  # If less than (by default) 3 scales, standard algorithm is faster
