@@ -26,7 +26,7 @@ Analysis, Springer-Verlag
     transform = AtrousTransform(Triangle)
     img = np.random.normal(size=(512, 512))
     coefficients = transform(img, len(denoise_sigma))
-    # coefficients.data is an ndarray that contains the proper coefficients
+    # coefficients.data is an ndarray that contains the coefficients proper
     coefficients.denoise(denoise_sigma)
     # coeffcients accepts numpy operations
     denoised = np.sum(coefficients, axis=0)
