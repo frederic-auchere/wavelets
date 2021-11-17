@@ -28,7 +28,7 @@ class Coefficients:
     def significance(self, sigma, scale, soft_threshold=True):
         if self.noise is None:
             self.noise = self.get_noise()
-        sigma_e = self.scaling_function.sigma_e(scale)
+        sigma_e = self.scaling_function.sigma_e[scale]
         if soft_threshold:
             r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))
             return special.erf(r / np.sqrt(2))
@@ -36,7 +36,7 @@ class Coefficients:
             s = np.abs(self.data[scale]) > (sigma * self.noise * sigma_e)
             return s
 
-    def de_noise(self, sigma, weights=None, soft_threshold=True):
+    def denoise(self, sigma, weights=None, soft_threshold=True):
         if weights is None:
             weights = (1,)*len(sigma)
         for scl, (c, sig, wgt) in enumerate(zip(self.data, sigma, weights)):
