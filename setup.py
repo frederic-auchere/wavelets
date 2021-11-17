@@ -27,6 +27,8 @@ REQUIRED = [
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+print(find_packages())
+
 setup(
     name=NAME,
     version=VERSION,
@@ -37,7 +39,6 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    packages=[''],
     install_requires=REQUIRED,
     license='LGPL-v3',
     classifiers=[
@@ -48,7 +49,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
     ],
-    package_dir={'': 'watroo'},
+    py_modules=find_packages(),
     zip_safe=False,
     ext_modules=None,
 )
