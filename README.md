@@ -15,7 +15,21 @@ Analysis, Springer-Verlag
 
 ## Utils
 
-## Instalation
+## Examples
+
+    from watroo import AtrousTransform, Triangle
+
+    denoise_sigma = [5, 3]
+    transform = AtrousTransform(Triangle)
+    coefficients = transform(img, len(denoise_sigma))
+    # coefficients.data is an ndarray that contains the cofeecients proper
+    coefficients.denoise(denoise_sigma)
+    # coeffcients accepts numpy operations
+    denoised = np.sum(coefficients, axis=0)
+    # which is equivalent to
+    denoised = coefficients.data.sum(axis=0)
+
+## Installation
 
 From the active environment
 
