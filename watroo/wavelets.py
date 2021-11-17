@@ -28,6 +28,8 @@ class Coefficients:
     def significance(self, sigma, scale, soft_threshold=True):
         if self.noise is None:
             self.noise = self.get_noise()
+            if self.noise == 0:
+                return np.ones_like(self.data[0])
         sigma_e = self.scaling_function.sigma_e[scale]
         if soft_threshold:
             r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))

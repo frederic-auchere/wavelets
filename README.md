@@ -13,6 +13,8 @@ Analysis, Springer-Verlag
 
 ## 'A trous' transform
 
+ATrousTransform implements a dyadic 'à-trous' transform
+
 ## Utils
 
 ## Examples
@@ -32,6 +34,14 @@ Analysis, Springer-Verlag
     denoised = np.sum(coefficients, axis=0)
     # which is equivalent to
     denoised = coefficients.data.sum(axis=0)
+
+The same result cam be obtained using the *denoise* convenience function
+
+    from watroo import Triangle, denoise
+
+    img = np.random.normal(size=(512, 512))
+    denoise_sigma = [5, 3]
+    denoised = denoise(img, Triangle, denoise_sigma)
 
 ### Extract significant coefficients at a given scale
 
