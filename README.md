@@ -17,10 +17,14 @@ Analysis, Springer-Verlag
 
 ## Examples
 
+### Denoise an image 
+
+    import numpy as np
     from watroo import AtrousTransform, Triangle
 
     denoise_sigma = [5, 3]
     transform = AtrousTransform(Triangle)
+    img = np.random.normal(size=(512, 512))
     coefficients = transform(img, len(denoise_sigma))
     # coefficients.data is an ndarray that contains the cofeecients proper
     coefficients.denoise(denoise_sigma)
@@ -28,6 +32,13 @@ Analysis, Springer-Verlag
     denoised = np.sum(coefficients, axis=0)
     # which is equivalent to
     denoised = coefficients.data.sum(axis=0)
+
+### Extract significant coefficients at a given scale
+
+    # return a ndarray containing the 3-sigma significance of coefficiens
+    # at scale 2 with hard thresholding
+    s = coefficients.significance(3, 2, soft_threshold=False)
+
 
 ## Installation
 
