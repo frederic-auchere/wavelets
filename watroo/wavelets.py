@@ -114,7 +114,7 @@ class AbstractScalingFunction:
         transform = AtrousTransform(self.__class__)
         std = np.zeros(n_scales)
         for i in range(n_trials):
-            data = np.random.normal(size=(2**n_scales,)*self.n_dim)
+            data = np.random.normal(size=(2**n_scales,)*self.n_dim).astype(np.float32)
             coefficients = transform(data, n_scales)
             std += coefficients.data[:-1].std(axis=tuple(range(1, self.n_dim+1)))
         std /= n_trials
@@ -137,12 +137,18 @@ class Triangle(AbstractScalingFunction):
         return np.array([1/4, 1/2, 1/4])
 
     @property
+    def sigma_e_1d(self):
+        return np.array([0.60840933, 0.33000059, 0.21157957, 0.145824, 0.10158388,
+                         0.07155912, 0.04902655, 0.03529812, 0.02409187, 0.01722846])
+
+    @property
     def sigma_e_2d(self):
-        return np.array([0.889, 0.200, 0.086, 0.041, 0.020, 0.010, 0.005, 0.00280, 0.00135, 0.00085, 0.00029])
+        return np.array([0.7999247, 0.27308452, 0.11998217, 0.05793947, 0.0288104,
+                         0.01447795, 0.00733832, 0.0037203, 0.00192882, 0.00098568])
 
     @property
     def sigma_e_3d(self):
-        return np.array([0.956, 0.120, 0.035, 0.012, 0.004, 0.001, 0.0005])
+        return np.array([0.89736751, 0.19514386, 0.06239262, 0.02311278, 0.00939645])
 
 
 class B3spline(AbstractScalingFunction):
@@ -172,7 +178,7 @@ class B3spline(AbstractScalingFunction):
 
     @property
     def sigma_e_3d(self):
-        return np.array([0.956, 0.120, 0.035, 0.012, 0.004, 0.001, 0.0005])
+        return np.array([0.95633954, 0.12491933, 0.03933029, 0.01489642, 0.0064108])
 
 
 class AtrousTransform:
