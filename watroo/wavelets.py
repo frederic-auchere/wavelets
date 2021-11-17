@@ -37,6 +37,7 @@ class Coefficients:
             s = np.abs(self.data[scale]) > (sigma * self.noise * sigma_e)
             # regions, _ = label(s)
             # slices = find_objects(regions)
+
             # w = np.zeros_like(coeff)
             # for slc in slices:
             #     ok = s[slc]
