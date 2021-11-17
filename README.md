@@ -26,7 +26,7 @@ Analysis, Springer-Verlag
     transform = AtrousTransform(Triangle)
     img = np.random.normal(size=(512, 512))
     coefficients = transform(img, len(denoise_sigma))
-    # coefficients.data is an ndarray that contains the cofeecients proper
+    # coefficients.data is an ndarray that contains the proper coefficients
     coefficients.denoise(denoise_sigma)
     # coeffcients accepts numpy operations
     denoised = np.sum(coefficients, axis=0)
@@ -35,7 +35,7 @@ Analysis, Springer-Verlag
 
 ### Extract significant coefficients at a given scale
 
-    # return a ndarray containing the 3-sigma significance of coefficiens
+    # return a ndarray containing the 3-sigma significance of coefficients
     # at scale 2 with hard thresholding
     s = coefficients.significance(3, 2, soft_threshold=False)
 
