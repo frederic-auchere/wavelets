@@ -82,16 +82,16 @@ def enhance(*args, weights=None, denoise=None, soft_threshold=True, out=None, **
     return out
 
 
-def denoise(data, scaling_function, denoise_coeffs, soft_threshold=False):
+def denoise(data, scaling_function, weights, soft_threshold=False):
     """
     Convenience function to denoise a data array
     :param data: ndarray-like, the data to denoise
     :param scaling_function: scaling function class, one of those defined in wavelets.py
-    :param denoise_coeffs: list, weighting coefficients
+    :param weights: list, weighting coefficients
     :param soft_threshold: boolean, whether to used sof or hard thresholding of the coefficients
     :return: a ndarray containing the denoised data
     """
     transform = AtrousTransform(scaling_function)
-    coefficients = transform(data, len(denoise_coeffs))
-    coefficients.denoise(denoise_coeffs, soft_threshold=soft_threshold)
+    coefficients = transform(data, len(weights))
+    coefficients.denoise(weights, soft_threshold=soft_threshold)
     return np.sum(coefficients, axis=0)
