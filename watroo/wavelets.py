@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
-# from scipy.ndimage import label, find_objects
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle']
 
@@ -35,13 +34,6 @@ class Coefficients:
             return special.erf(r / np.sqrt(2))
         else:
             s = np.abs(self.data[scale]) > (sigma * self.noise * sigma_e)
-            # regions, _ = label(s)
-            # slices = find_objects(regions)
-            # w = np.zeros_like(coeff)
-            # for slc in slices:
-            #     ok = s[slc]
-            #     n_pix = ok.sum()
-            #     w[slc][ok] = special.erf((n_pix-1))
             return s
 
     def de_noise(self, sigma, weights=None, soft_threshold=True):
