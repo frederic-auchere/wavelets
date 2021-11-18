@@ -49,6 +49,14 @@ The same result cam be obtained using the *denoise* convenience function
     # at scale 2 with hard thresholding
     s = coefficients.significance(3, 2, soft_threshold=False)
 
+### Compute the standard deviation of Gaussian white noise
+
+    # compute 10 scales of the 2D B3spline
+    w = B3spline(2)
+    w.compute_noise_weights(10)
+
+This returns a 1-D ndarray containing the normalization
+used to estimate the significance of coefficients.
 
 ## Installation
 

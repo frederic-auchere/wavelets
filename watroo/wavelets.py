@@ -125,7 +125,7 @@ class AbstractScalingFunction:
 
 class Triangle(AbstractScalingFunction):
     """
-    Triangle scaling function
+    Triangle scaling function (3 x 3 interpolation)
     See appendix A of J.-L. Starck & F. Murtagh, Handbook of Astronomical Data
     Analysis, Springer-Verlag
     """
