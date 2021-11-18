@@ -2,6 +2,7 @@
 
 import copy
 import numpy as np
+import cv2
 from . import AtrousTransform
 
 __all__ = ['denoise']
@@ -95,3 +96,49 @@ def denoise(data, scaling_function, weights, soft_threshold=True):
     coefficients = transform(data, len(weights))
     coefficients.denoise(weights, soft_threshold=soft_threshold)
     return np.sum(coefficients, axis=0)
+
+
+def mgn(img, k=0.7, h=0.7, gamma=3.2, scales=[1.25, 2.5, 5, 10, 20, 40]):
+    c = 0
+    for s in scales:
+        conv = img - cv2.GaussianBlur(img, (0, 0), s)
+        std = np.sqrt(cv2.GaussianBlur(conv**2, (0, 0), s))
+        gd = std > 0
+        conv[gd] /= std[gd]
+        conv = np.arctan(k*conv)
+        c += conv
+    c /= len(scales)
+
+    g = np.copy(img)
+    g -= g.min()
+    g /= g.max()
+    g **= 1/gamma
+
+    return h*g + (1-h)*c
+
+
+def wave_mgn(img, k=0.7, h=0.7, gamma=3.2, denoise_weights=[1, 1, 1, 1, 1, 1, 1]):
+
+    nscales = len(denoise_weights)
+    transform = AtrousTransform()
+    coefficients = transform(img, nscales)
+    scales = np.linspace(0, nscales-1, nscales, dtype=int)
+    coefficients.denoise(denoise_weights)
+
+    c = 0
+    for s in scales:
+        conv = coefficients.data[0:s].sum(axis=0)
+
+        std = np.sqrt(cv2.GaussianBlur(conv**2, (0, 0), 2**s))
+        gd = std > 0
+        conv[gd] /= std[gd]
+        conv = np.arctan(k*conv)
+        c += conv
+    c /= len(scales)
+
+    g = np.copy(img)
+    g -= g.min()
+    g /= g.max()
+    g **= 1/gamma
+
+    return h*g + (1-h)*c
