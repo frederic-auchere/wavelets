@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
-# from scipy.ndimage import label, find_objects
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle']
 
@@ -29,22 +28,17 @@ class Coefficients:
     def significance(self, sigma, scale, soft_threshold=True):
         if self.noise is None:
             self.noise = self.get_noise()
-        sigma_e = self.scaling_function.sigma_e(scale)
+            if self.noise == 0:
+                return np.ones_like(self.data[0])
+        sigma_e = self.scaling_function.sigma_e[scale]
         if soft_threshold:
             r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))
             return special.erf(r / np.sqrt(2))
         else:
             s = np.abs(self.data[scale]) > (sigma * self.noise * sigma_e)
-            # regions, _ = label(s)
-            # slices = find_objects(regions
-            # w = np.zeros_like(coeff)
-            # for slc in slices:
-            #     ok = s[slc]
-            #     n_pix = ok.sum()
-            #     w[slc][ok] = special.erf((n_pix-1))
             return s
 
-    def de_noise(self, sigma, weights=None, soft_threshold=True):
+    def denoise(self, sigma, weights=None, soft_threshold=True):
         if weights is None:
             weights = (1,)*len(sigma)
         for scl, (c, sig, wgt) in enumerate(zip(self.data, sigma, weights)):
@@ -122,7 +116,7 @@ class AbstractScalingFunction:
         transform = AtrousTransform(self.__class__)
         std = np.zeros(n_scales)
         for i in range(n_trials):
-            data = np.random.normal(size=(2**n_scales,)*self.n_dim)
+            data = np.random.normal(size=(2**n_scales,)*self.n_dim).astype(np.float32)
             coefficients = transform(data, n_scales)
             std += coefficients.data[:-1].std(axis=tuple(range(1, self.n_dim+1)))
         std /= n_trials
@@ -131,7 +125,7 @@ class AbstractScalingFunction:
 
 class Triangle(AbstractScalingFunction):
     """
-    Triangle scaling function
+    Triangle scaling function (3 x 3 interpolation)
     See appendix A of J.-L. Starck & F. Murtagh, Handbook of Astronomical Data
     Analysis, Springer-Verlag
     """
@@ -145,12 +139,18 @@ class Triangle(AbstractScalingFunction):
         return np.array([1/4, 1/2, 1/4])
 
     @property
+    def sigma_e_1d(self):
+        return np.array([0.60840933, 0.33000059, 0.21157957, 0.145824, 0.10158388,
+                         0.07155912, 0.04902655, 0.03529812, 0.02409187, 0.01722846])
+
+    @property
     def sigma_e_2d(self):
-        return np.array([0.889, 0.200, 0.086, 0.041, 0.020, 0.010, 0.005, 0.00280, 0.00135, 0.00085, 0.00029])
+        return np.array([0.7999247, 0.27308452, 0.11998217, 0.05793947, 0.0288104,
+                         0.01447795, 0.00733832, 0.0037203, 0.00192882, 0.00098568])
 
     @property
     def sigma_e_3d(self):
-        return np.array([0.956, 0.120, 0.035, 0.012, 0.004, 0.001, 0.0005])
+        return np.array([0.89736751, 0.19514386, 0.06239262, 0.02311278, 0.00939645])
 
 
 class B3spline(AbstractScalingFunction):
@@ -180,7 +180,7 @@ class B3spline(AbstractScalingFunction):
 
     @property
     def sigma_e_3d(self):
-        return np.array([0.956, 0.120, 0.035, 0.012, 0.004, 0.001, 0.0005])
+        return np.array([0.95633954, 0.12491933, 0.03933029, 0.01489642, 0.0064108])
 
 
 class AtrousTransform:
