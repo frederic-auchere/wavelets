@@ -62,14 +62,12 @@ def enhance(*args, weights=None, denoise=None, soft_threshold=True, out=None, **
         dns = denoise if c is Ellipsis else denoise[c]
         wgt = weights if c is Ellipsis else weights[c]
 
-        # adds 0 to prevent de-noising the last wavelet plane (smoothed image)
-        dns.extend([0])
         if len(wgt) < len(dns):
             wgt.extend([1]*(len(dns) - len(wgt)))
         elif len(dns) < len(wgt):
             dns.extend([0]*(len(wgt) - len(dns)))
 
-        coeffs = atrous(img[c], len(wgt)-1)
+        coeffs = atrous(img[c], len(wgt))
         if len(args) == 2:
             coeffs.noise = args[1] if c is Ellipsis else args[1][c]
         else:
