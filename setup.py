@@ -27,8 +27,6 @@ REQUIRED = [
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-print(find_packages())
-
 setup(
     name=NAME,
     version=VERSION,
@@ -49,7 +47,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
     ],
-    py_modules=find_packages(),
+    packages=find_packages(),
     zip_safe=False,
     ext_modules=None,
 )
