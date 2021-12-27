@@ -75,7 +75,7 @@ def enhance(*args, weights=None, denoise=None, soft_threshold=True, out=None, **
         else:
             coeffs.noise = coeffs.get_noise()
 
-        coeffs.de_noise(dns, weights=wgt, soft_threshold=soft_threshold)
+        coeffs.denoise(dns, weights=wgt, soft_threshold=soft_threshold)
 
         coeffs.data.sum(axis=0, out=out[c])
 
