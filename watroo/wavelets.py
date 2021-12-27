@@ -175,7 +175,7 @@ class B3spline(AbstractScalingFunction):
 
     @property
     def sigma_e_2d(self):
-        return np.array([0.8907e-01, 2.0072e-01, 8.5551e-02, 4.1261e-02, 2.0470e-02,
+        return np.array([8.907e-01, 2.0072e-01, 8.5551e-02, 4.1261e-02, 2.0470e-02,
                          1.0232e-02, 5.1435e-03, 2.6008e-03, 1.3161e-03, 6.7359e-04])
 
     @property
