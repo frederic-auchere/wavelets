@@ -5,7 +5,7 @@ import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
 
-__all__ = ['AtrousTransform', 'B3spline', 'Triangle']
+__all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
 
 
 class Coefficients:
