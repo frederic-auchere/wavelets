@@ -117,13 +117,13 @@ def mgn(img, k=0.7, h=0.7, gamma=3.2, scales=[1.25, 2.5, 5, 10, 20, 40]):
     return h*g + (1-h)*c
 
 
-def wave_mgn(img, k=0.7, h=0.7, gamma=3.2, denoise_weights=[1, 1, 1, 1, 1, 1, 1]):
+def wave_mgn(img, k=0.7, h=0.7, gamma=3.2, denoise_weights=[1, 1, 1, 1, 1, 1, 1], soft_threshold=True):
 
     nscales = len(denoise_weights)
     transform = AtrousTransform()
     coefficients = transform(img, nscales)
     scales = np.linspace(0, nscales-1, nscales, dtype=int)
-    coefficients.denoise(denoise_weights)
+    coefficients.denoise(denoise_weights, soft_threshold=soft_threshold)
 
     c = 0
     for s in scales:

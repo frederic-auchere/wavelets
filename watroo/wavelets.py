@@ -5,7 +5,7 @@ import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
 
-__all__ = ['AtrousTransform', 'B3spline', 'Triangle']
+__all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
 
 
 class Coefficients:
@@ -32,8 +32,12 @@ class Coefficients:
                 return np.ones_like(self.data[0])
         sigma_e = self.scaling_function.sigma_e[scale]
         if soft_threshold:
-            r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))
-            return special.erf(r / np.sqrt(2))
+            if sigma != 0:
+                r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))
+                # return special.erf(r / np.sqrt(2))
+                return r / (1 + r)
+            else:
+                return 1
         else:
             s = np.abs(self.data[scale]) > (sigma * self.noise * sigma_e)
             return s
@@ -175,7 +179,7 @@ class B3spline(AbstractScalingFunction):
 
     @property
     def sigma_e_2d(self):
-        return np.array([0.8907e-01, 2.0072e-01, 8.5551e-02, 4.1261e-02, 2.0470e-02,
+        return np.array([8.907e-01, 2.0072e-01, 8.5551e-02, 4.1261e-02, 2.0470e-02,
                          1.0232e-02, 5.1435e-03, 2.6008e-03, 1.3161e-03, 6.7359e-04])
 
     @property
