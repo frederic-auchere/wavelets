@@ -39,8 +39,7 @@ class Coefficients:
             else:
                 return 1
         else:
-            s = np.abs(self.data[scale]) > (sigma * self.noise * sigma_e)
-            return s
+            return np.abs(self.data[scale]) > (sigma * self.noise * sigma_e)
 
     def denoise(self, sigma, weights=None, soft_threshold=True):
         if weights is None:
@@ -145,12 +144,14 @@ class Triangle(AbstractScalingFunction):
     @property
     def sigma_e_1d(self):
         return np.array([0.60840933, 0.33000059, 0.21157957, 0.145824, 0.10158388,
-                         0.07155912, 0.04902655, 0.03529812, 0.02409187, 0.01722846])
+                         0.07155912, 0.04902655, 0.03529812, 0.02409187, 0.01722846,
+                         0.01144442])
 
     @property
     def sigma_e_2d(self):
         return np.array([0.7999247, 0.27308452, 0.11998217, 0.05793947, 0.0288104,
-                         0.01447795, 0.00733832, 0.0037203, 0.00192882, 0.00098568])
+                         0.01447795, 0.00733832, 0.0037203, 0.00192882, 0.00098568,
+                         0.00048533])
 
     @property
     def sigma_e_3d(self):
@@ -175,12 +176,14 @@ class B3spline(AbstractScalingFunction):
     @property
     def sigma_e_1d(self):
         return np.array([0.72514976, 0.28538683, 0.17901161, 0.12222841, 0.08469601,
-                         0.06027006, 0.04242257, 0.02919823, 0.01805671, 0.01383672])
+                         0.06027006, 0.04242257, 0.02919823, 0.01805671, 0.01383672,
+                         0.00943623])
 
     @property
     def sigma_e_2d(self):
         return np.array([8.907e-01, 2.0072e-01, 8.5551e-02, 4.1261e-02, 2.0470e-02,
-                         1.0232e-02, 5.1435e-03, 2.6008e-03, 1.3161e-03, 6.7359e-04])
+                         1.0232e-02, 5.1435e-03, 2.6008e-03, 1.3161e-03, 6.7359e-04,
+                         4.0040e-04])
 
     @property
     def sigma_e_3d(self):
