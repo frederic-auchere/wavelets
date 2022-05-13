@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
-
 import copy
 import numpy as np
 import cv2
-from . import AtrousTransform
+from . import AtrousTransform, B3spline
 
 __all__ = ['denoise']
 
@@ -117,28 +115,31 @@ def mgn(img, k=0.7, h=0.7, gamma=3.2, scales=[1.25, 2.5, 5, 10, 20, 40]):
     return h*g + (1-h)*c
 
 
-def wave_mgn(img, k=0.7, h=0.7, gamma=3.2, denoise_weights=[1, 1, 1, 1, 1, 1, 1], soft_threshold=True):
+def wow(image, scaling_function=B3spline, n_scales=None):
 
-    nscales = len(denoise_weights)
-    transform = AtrousTransform()
-    coefficients = transform(img, nscales)
-    scales = np.linspace(0, nscales-1, nscales, dtype=int)
-    coefficients.denoise(denoise_weights, soft_threshold=soft_threshold)
+    if n_scales is None:
+        n_scales = int(np.log2(min(image.shape)) - 2)
 
-    c = 0
-    for s in scales:
-        conv = coefficients.data[0:s].sum(axis=0)
-
-        std = np.sqrt(cv2.GaussianBlur(conv**2, (0, 0), 2**s))
-        gd = std > 0
-        conv[gd] /= std[gd]
-        conv = np.arctan(k*conv)
-        c += conv
-    c /= len(scales)
-
-    g = np.copy(img)
-    g -= g.min()
-    g /= g.max()
-    g **= 1/gamma
-
-    return h*g + (1-h)*c
+    transform = AtrousTransform(scaling_function)
+    coefficients = transform(image, n_scales)
+    for s, c in enumerate(coefficients.data):
+        atrous_kernel = transform.scaling_function_class(2).atrous_kernel(s)
+        mean = np.empty_like(c)
+        cv2.filter2D(c,
+                     -1,  # Same pixel depth as input
+                     atrous_kernel,
+                     mean,
+                     (-1, -1),  # Anchor is kernel center
+                     0,  # Optional offset
+                     cv2.BORDER_REFLECT)
+        vari = np.empty_like(coefficients.data[s])
+        cv2.filter2D((c - mean)**2,
+                     -1,  # Same pixel depth as input
+                     atrous_kernel,
+                     vari,
+                     (-1, -1),  # Anchor is kernel center
+                     0,  # Optional offset
+                     cv2.BORDER_REFLECT)
+        vari[vari <= 0] = 1e-20
+        c /= np.sqrt(vari)
+    return np.sum(coefficients.data[:-1], axis=0)
