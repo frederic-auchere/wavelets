@@ -115,31 +115,45 @@ def mgn(img, k=0.7, h=0.7, gamma=3.2, scales=[1.25, 2.5, 5, 10, 20, 40]):
     return h*g + (1-h)*c
 
 
-def wow(image, scaling_function=B3spline, n_scales=None):
+def sdev_loc(image, kernel):
+    mean = np.empty_like(image)
+    cv2.filter2D(image,
+                 -1,  # Same pixel depth as input
+                 kernel,
+                 mean,
+                 (-1, -1),  # Anchor is kernel center
+                 0,  # Optional offset
+                 cv2.BORDER_REFLECT)
+    vari = np.empty_like(image)
+    cv2.filter2D((image - mean) ** 2,
+                 -1,  # Same pixel depth as input
+                 kernel,
+                 vari,
+                 (-1, -1),  # Anchor is kernel center
+                 0,  # Optional offset
+                 cv2.BORDER_REFLECT)
+    vari[vari <= 0] = 1e-20
+    return np.sqrt(vari)
+
+
+def wow(image, scaling_function=B3spline, n_scales=None, weights=[], denoise_coefficients=[], global_whitening=False):
 
     if n_scales is None:
         n_scales = int(np.log2(min(image.shape)) - 2)
 
+    n_weights = len(weights)
+    if n_weights < n_scales:
+        weights.extend([1,]*(n_scales - n_weights))
+
     transform = AtrousTransform(scaling_function)
     coefficients = transform(image, n_scales)
-    for s, c in enumerate(coefficients.data):
-        atrous_kernel = transform.scaling_function_class(2).atrous_kernel(s)
-        mean = np.empty_like(c)
-        cv2.filter2D(c,
-                     -1,  # Same pixel depth as input
-                     atrous_kernel,
-                     mean,
-                     (-1, -1),  # Anchor is kernel center
-                     0,  # Optional offset
-                     cv2.BORDER_REFLECT)
-        vari = np.empty_like(coefficients.data[s])
-        cv2.filter2D((c - mean)**2,
-                     -1,  # Same pixel depth as input
-                     atrous_kernel,
-                     vari,
-                     (-1, -1),  # Anchor is kernel center
-                     0,  # Optional offset
-                     cv2.BORDER_REFLECT)
-        vari[vari <= 0] = 1e-20
-        c /= np.sqrt(vari)
-    return np.sum(coefficients.data[:-1], axis=0)
+    coefficients.denoise(np.float32(denoise_coefficients))
+    std = []
+    for s, (c, w) in enumerate(zip(coefficients.data[:-1], weights)):
+        atrous_kernel = transform.scaling_function_class(c.ndim).atrous_kernel(s)
+        if global_whitening:
+            std.append(np.std(c))
+        else:
+            std.append(sdev_loc(c, atrous_kernel))
+        c *= w/std[s]
+    return np.sum(coefficients.data[:-1], axis=0), std
