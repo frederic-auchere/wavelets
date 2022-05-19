@@ -34,8 +34,8 @@ class Coefficients:
         if soft_threshold:
             if sigma != 0:
                 r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))
-                # return special.erf(r / np.sqrt(2))
-                return r / (1 + r)
+                return special.erf(r / np.sqrt(2))
+#                return r / (1 + r)
             else:
                 return 1
         else:
