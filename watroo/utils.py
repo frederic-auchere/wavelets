@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
-
 import copy
 import numpy as np
-from . import AtrousTransform
+import cv2
+from . import AtrousTransform, B3spline
+from scipy.ndimage import convolve, generic_filter
 
 __all__ = ['denoise']
 
@@ -93,3 +93,60 @@ def denoise(data, scaling_function, weights, soft_threshold=True):
     coefficients = transform(data, len(weights))
     coefficients.denoise(weights, soft_threshold=soft_threshold)
     return np.sum(coefficients, axis=0)
+
+
+def sdev_loc(image, kernel):
+    mean2 = cv2.filter2D(image, -1, kernel, borderType=cv2.BORDER_REFLECT)
+    mean2 **= 2
+    std2 = cv2.filter2D(image**2, -1, kernel, borderType=cv2.BORDER_REFLECT)
+    std2 -= mean2
+    std2[std2 <= 0] = 1e-20
+    return np.sqrt(std2)
+
+
+def wow(image,
+        scaling_function=B3spline,
+        n_scales=None,
+        weights=[],
+        denoise_coefficients=[],
+        preserve_variance=False):
+
+    if n_scales is None:
+        n_scales = int(np.log2(min(image.shape)) - 2)
+
+    n_weights = len(weights)
+    if n_weights < n_scales:
+        weights.extend([1,]*(n_scales - n_weights))
+
+    n_denoise_coefficients = len(denoise_coefficients)
+    if n_denoise_coefficients < n_scales:
+        denoise_coefficients.extend([0,]*(n_scales - n_denoise_coefficients))
+
+    transform = AtrousTransform(scaling_function)
+    coefficients = transform(image, n_scales)
+    coefficients.noise = coefficients.get_noise()
+    scaling_function = transform.scaling_function_class(image.ndim)
+
+    pwr = []
+    gamma_image = np.copy(coefficients.data[-1])
+    for s, (c, w, d, se) in enumerate(zip(coefficients.data[:-1],
+                                          weights,
+                                          denoise_coefficients,
+                                          scaling_function.sigma_e)):
+        power = c**2
+        if preserve_variance:
+            power_norm = np.sqrt(np.mean(power))
+        else:
+            power_norm = 1
+        atrous_kernel = scaling_function.atrous_kernel(s)
+        local_power = cv2.filter2D(power, -1, atrous_kernel, borderType=cv2.BORDER_REFLECT)
+        local_power[local_power <= 0] = 1e-15
+        np.sqrt(local_power, out=local_power)
+        pwr.append(local_power)
+        c *= coefficients.significance(d, s, soft_threshold=True)
+        gamma_image += c
+        c *= w*power_norm/pwr[s]
+
+    recon = np.sum(coefficients.data[:-1], axis=0)
+
+    return recon, pwr
