@@ -203,7 +203,7 @@ class AtrousTransform:
         """
         self.scaling_function_class = scaling_function_class
 
-    def __call__(self, arr, level, recursive=False):
+    def __call__(self, arr, level, recursive=False, bilateral=None):
         """
         Performs the 'à trous' transform.
         Uses either a recursive algorithm or a standard algorithm.
@@ -216,12 +216,13 @@ class AtrousTransform:
             raise ValueError("Unsupported number of dimensions")
 
         scaling_function = self.scaling_function_class(arr.ndim)
-        if recursive:
+        if recursive or bilateral:
             return Coefficients(
                                 self.atrous_recursive(arr,
                                                       level,
-                                                      scaling_function),
-                                scaling_function
+                                                      scaling_function,
+                                                      bilateral=bilateral),
+                                scaling_function,
             )
         else:
             return Coefficients(
@@ -232,7 +233,7 @@ class AtrousTransform:
             )
 
     @staticmethod
-    def atrous_recursive(arr, level, scaling_function):
+    def atrous_recursive(arr, level, scaling_function, bilateral=None):
         """
         Performs 'à trous' wavelet transform of input array arr over level scales,
         as described in Appendix A of J.-L. Starck & F. Murtagh, Handbook of
@@ -251,7 +252,7 @@ class AtrousTransform:
         C2  -4  -3  -2  -1   0   1   2   3   4
         """
 
-        def recursive_convolution(conv, s=0, dx=0, dy=0, dz=0):
+        def recursive_convolution(conv, s=0, dx=0, dy=0, dz=0, bilateral=bilateral):
             """
             Recursively computes the 'à trous' convolution of the input array by
             extracting 'à trous' sub-arrays instead of using an 'à trous' kernel.
@@ -265,22 +266,28 @@ class AtrousTransform:
             s=0: current scale at which the convolution is performed
             dx=0, dy=0: current offsets of the sub-array
             """
-            if conv.ndim == 2:
-                cv2.filter2D(conv,
-                             -1,        # Same pixel depth as input
-                             kernel,    # Kernel known from outer context
-                             conv,      # In place operation
-                             (-1, -1),  # Anchor is at kernel center
-                             0,         # Optional offset
-                             cv2.BORDER_REFLECT)
+            if bilateral is None:
+                if conv.ndim == 2:
+                    cv2.filter2D(conv,
+                                 -1,        # Same pixel depth as input
+                                 kernel,    # Kernel known from outer context
+                                 conv,      # In place operation
+                                 (-1, -1),  # Anchor is at kernel center
+                                 0,         # Optional offset
+                                 cv2.BORDER_REFLECT)
+                else:
+                    convolve(conv,
+                             kernel,
+                             output=conv,
+                             mode='mirror')
             else:
-                convolve(conv,
-                         kernel,
-                         output=conv,
-                         mode='mirror')
+                # A Gaussian with d=5 & sigma_spatial=1 approximates a B3spline
+                conv[:] = cv2.bilateralFilter(conv, 5, bilateral, 1, borderType=cv2.BORDER_REFLECT)
 
-            stride = (slice(None, None, 2**s),)*conv.ndim
-            coeffs[stride] = conv
+            if conv.ndim == 2:
+                coeffs[s+1, dy::2**s, dx::2**s] = conv
+            else:
+                coeffs[s+1, dz::2**s, dy::2**s, dx::2**s] = conv
 
             if s == level-1:
                 return
