@@ -4,8 +4,41 @@ import cv2
 import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
+from skimage.restoration import denoise_bilateral
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
+
+
+def sdev_loc(image, kernel, variance=False):
+    mean2 = cv2.filter2D(image, -1, kernel, borderType=cv2.BORDER_REFLECT)
+    mean2 **= 2
+    vari = cv2.filter2D(image**2, -1, kernel, borderType=cv2.BORDER_REFLECT)
+    vari -= mean2
+    vari[vari <= 0] = 1e-20
+    if variance:
+        return vari
+    else:
+        return np.sqrt(vari)
+
+def bilateral_filter(image, kernel, variance, mode="symmetric"):
+
+    hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
+    padded = np.pad(image, (hwy, hwx), mode=mode)
+    output = kernel[hwy+1, hwx+1]*image
+    norm = np.full_like(image, kernel[hwy+1, hwx+1])
+    shifted = np.empty_like(image)
+
+    y, x, = np.indices(kernel.shape)
+    x = kernel.shape[1] - 1 - x
+    y = kernel.shape[0] - 1 - y
+    mask = np.ones(kernel.shape, dtype=bool)
+    mask[hwy+1, hwx+1] = False
+    for dx, dy, k in zip(x[mask], y[mask], kernel[mask]):
+        shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
+        diff = k*np.exp(-0.5*((image - shifted)**2)/variance)
+        norm += diff
+        output += shifted*diff
+    return output/norm
 
 
 class Coefficients:
@@ -281,8 +314,11 @@ class AtrousTransform:
                              output=conv,
                              mode='mirror')
             else:
-                # A Gaussian with d=5 & sigma_spatial=1 approximates a B3spline
-                conv[:] = cv2.bilateralFilter(conv, 5, bilateral, 1, borderType=cv2.BORDER_REFLECT)
+                # A Gaussian with d=5 & sigmaSpace=1.1 approximates a B3spline
+                # conv[:] = cv2.bilateralFilter(conv, 5, bilateral*2**s, 1.1, borderType=cv2.BORDER_REFLECT)
+                # sdev = bilateral*2*np.std(conv)
+                variance = sdev_loc(conv, kernel, variance=True)
+                conv[:] = bilateral_filter(conv, kernel, variance)
 
             if conv.ndim == 2:
                 coeffs[s+1, dy::2**s, dx::2**s] = conv
@@ -323,7 +359,7 @@ class AtrousTransform:
         return coeffs
 
     @staticmethod
-    def atrous_standard(arr, level, scaling_function):
+    def atrous_standard(arr, level, scaling_function, bilateral=None):
         """
         Performs 'à trous' wavelet transform of input array arr over level scales,
         as described in Appendix A of J.-L. Starck & F. Murtagh, Handbook of

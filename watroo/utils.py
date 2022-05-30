@@ -1,8 +1,7 @@
 import copy
 import numpy as np
 import cv2
-from . import AtrousTransform, B3spline
-from scipy.ndimage import convolve, generic_filter
+from . import AtrousTransform, B3spline, Coefficients
 
 __all__ = ['denoise', 'wow']
 
@@ -104,40 +103,46 @@ def sdev_loc(image, kernel):
     return np.sqrt(std2)
 
 
-def wow(image,
+def wow(data,
         scaling_function=B3spline,
         n_scales=None,
         weights=[],
-        gamma=1,
-        h=0,
+        whitening=True,
         denoise_coefficients=[],
         bilateral=None,
+        soft_threshold=True,
         preserve_variance=False):
 
-    if n_scales is None:
-        n_scales = int(np.log2(min(image.shape)) - 2)
+    if type(data) is np.ndarray:  # input is an image
+        if n_scales is None:
+            n_scales = int(np.log2(min(data.shape)) - 2)
 
-    n_weights = len(weights)
+        transform = AtrousTransform(scaling_function)
+        coefficients = transform(data, n_scales, recursive=True, bilateral=bilateral)
+    elif type(data) is Coefficients:  # input is already computed coefficients
+        coefficients = data
+        n_scales = len(coefficients)-1
+    else:
+        raise ValueError('Unknown input type')
+
+    recomposition_weights = copy.copy(weights)
+    n_weights = len(recomposition_weights)
     if n_weights <= n_scales:
-        weights.extend([1,]*(n_scales - n_weights + 1))
+        recomposition_weights.extend([1, ]*(n_scales - n_weights + 1))
 
-    n_denoise_coefficients = len(denoise_coefficients)
+    scale_denoise_coefficients = copy.copy(denoise_coefficients)
+    n_denoise_coefficients = len(scale_denoise_coefficients)
     if n_denoise_coefficients < n_scales:
-        denoise_coefficients.extend([0,]*(n_scales - n_denoise_coefficients))
-        denoise_coefficients.append([1,])
-
-    transform = AtrousTransform(scaling_function)
-    coefficients = transform(image, n_scales, bilateral=bilateral)
-    coefficients.noise = coefficients.get_noise()
-    scaling_function = transform.scaling_function_class(image.ndim)
+        scale_denoise_coefficients.extend([0, ]*(n_scales - n_denoise_coefficients))
+    if len(scale_denoise_coefficients) == n_scales:
+            scale_denoise_coefficients.extend([1, ])
 
     pwr = []
-    gamma_image = np.copy(coefficients.data[-1])
-    local_power = np.empty_like(image)
+    local_power = np.empty_like(coefficients.data[0])
     for s, (c, w, d, se) in enumerate(zip(coefficients.data,
-                                          weights,
-                                          denoise_coefficients,
-                                          scaling_function.sigma_e)):
+                                          recomposition_weights,
+                                          scale_denoise_coefficients,
+                                          coefficients.scaling_function.sigma_e)):
         power = c**2
         if preserve_variance:
             if s == n_scales:
@@ -147,25 +152,22 @@ def wow(image,
         else:
             power_norm = 1
         if s == n_scales:
-            local_power = np.std(c)
+            if whitening:
+                local_power = np.std(c)
+            else:
+                local_power = 1
         else:
-            atrous_kernel = scaling_function.atrous_kernel(s)
-            cv2.filter2D(power, -1, atrous_kernel, dst=local_power, borderType=cv2.BORDER_REFLECT)
-            local_power[local_power <= 0] = 1e-15
-            np.sqrt(local_power, out=local_power)
-            c *= coefficients.significance(d, s, soft_threshold=True)
+            if whitening:
+                atrous_kernel = coefficients.scaling_function.atrous_kernel(s)
+                cv2.filter2D(power, -1, atrous_kernel, dst=local_power, borderType=cv2.BORDER_REFLECT)
+                local_power[local_power <= 0] = 1e-15
+                np.sqrt(local_power, out=local_power)
+            else:
+                local_power = 1
+            c *= coefficients.significance(d, s, soft_threshold=soft_threshold)
         pwr.append(local_power)
-        gamma_image += c
         c *= w*power_norm/pwr[s]
 
     recon = np.sum(coefficients, axis=0)
-    recon *= 1 - h
-
-    gamma_image -= gamma_image.min()
-    gamma_image /= gamma_image.max()
-    gamma_image **= 1/gamma
-    gamma_image *= h
-
-    recon = gamma_image + recon
 
     return recon, pwr
