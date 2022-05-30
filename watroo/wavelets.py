@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
-from skimage.restoration import denoise_bilateral
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
 
@@ -19,6 +18,7 @@ def sdev_loc(image, kernel, variance=False):
         return vari
     else:
         return np.sqrt(vari)
+
 
 def bilateral_filter(image, kernel, variance, mode="symmetric"):
 
