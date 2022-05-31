@@ -24,17 +24,15 @@ def bilateral_filter(image, kernel, variance, mode="symmetric"):
 
     hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
     padded = np.pad(image, (hwy, hwx), mode=mode)
-    output = np.zeros_like(image)
-    norm = np.zeros_like(image)
-    # output = kernel[hwy+1, hwx+1]*image
-    # norm = np.full_like(image, kernel[hwy+1, hwx+1])
+    output = kernel[hwy, hwx]*image
+    norm = np.full_like(image, kernel[hwy, hwx])
     shifted = np.empty_like(image)
 
     y, x, = np.indices(kernel.shape)
     x = kernel.shape[1] - 1 - x
     y = kernel.shape[0] - 1 - y
     mask = np.ones(kernel.shape, dtype=bool)
-    # mask[hwy+1, hwx+1] = False
+    mask[hwy, hwx] = False
     for dx, dy, k in zip(x[mask], y[mask], kernel[mask]):
         shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
         diff = k*np.exp(-0.5*((image - shifted)**2)/variance)
