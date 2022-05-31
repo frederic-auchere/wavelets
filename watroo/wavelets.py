@@ -24,15 +24,17 @@ def bilateral_filter(image, kernel, variance, mode="symmetric"):
 
     hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
     padded = np.pad(image, (hwy, hwx), mode=mode)
-    output = kernel[hwy+1, hwx+1]*image
-    norm = np.full_like(image, kernel[hwy+1, hwx+1])
+    output = np.zeros_like(image)
+    norm = np.zeros_like(image)
+    # output = kernel[hwy+1, hwx+1]*image
+    # norm = np.full_like(image, kernel[hwy+1, hwx+1])
     shifted = np.empty_like(image)
 
     y, x, = np.indices(kernel.shape)
     x = kernel.shape[1] - 1 - x
     y = kernel.shape[0] - 1 - y
     mask = np.ones(kernel.shape, dtype=bool)
-    mask[hwy+1, hwx+1] = False
+    # mask[hwy+1, hwx+1] = False
     for dx, dy, k in zip(x[mask], y[mask], kernel[mask]):
         shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
         diff = k*np.exp(-0.5*((image - shifted)**2)/variance)
@@ -316,7 +318,8 @@ class AtrousTransform:
             else:
                 # A Gaussian with d=5 & sigmaSpace=1.1 approximates a B3spline
                 # conv[:] = cv2.bilateralFilter(conv, 5, bilateral*2**s, 1.1, borderType=cv2.BORDER_REFLECT)
-                # sdev = bilateral*2*np.std(conv)
+                # conv[:] = cv2.bilateralFilter(conv, 5, np.std(conv), 1.1, borderType=cv2.BORDER_REFLECT)
+                # # sdev = bilateral*2*np.std(conv)
                 variance = sdev_loc(conv, kernel, variance=True)
                 conv[:] = bilateral_filter(conv, kernel, variance)
 

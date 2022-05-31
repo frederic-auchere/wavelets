@@ -165,7 +165,7 @@ def wow(data,
             else:
                 local_power = 1
             c *= coefficients.significance(d, s, soft_threshold=soft_threshold)
-        pwr.append(local_power)
+        pwr.append(np.copy(local_power))
         c *= w*power_norm/pwr[s]
 
     recon = np.sum(coefficients, axis=0)
