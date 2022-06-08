@@ -94,15 +94,6 @@ def denoise(data, scaling_function, weights, soft_threshold=True):
     return np.sum(coefficients, axis=0)
 
 
-def sdev_loc(image, kernel):
-    mean2 = cv2.filter2D(image, -1, kernel, borderType=cv2.BORDER_REFLECT)
-    mean2 **= 2
-    std2 = cv2.filter2D(image**2, -1, kernel, borderType=cv2.BORDER_REFLECT)
-    std2 -= mean2
-    std2[std2 <= 0] = 1e-20
-    return np.sqrt(std2)
-
-
 def wow(data,
         scaling_function=B3spline,
         n_scales=None,
@@ -116,14 +107,23 @@ def wow(data,
     if type(data) is np.ndarray:  # input is an image
         if n_scales is None:
             n_scales = int(np.log2(min(data.shape)) - 2)
-
         transform = AtrousTransform(scaling_function)
-        coefficients = transform(data, n_scales, recursive=True, bilateral=bilateral)
     elif type(data) is Coefficients:  # input is already computed coefficients
         coefficients = data
         n_scales = len(coefficients)-1
     else:
         raise ValueError('Unknown input type')
+
+    if bilateral is None:
+        sigma_bilateral = None
+    else:
+        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral, ]*(n_scales+1)
+        n_bilateral = len(sigma_bilateral)
+        if n_bilateral <= n_scales:
+            sigma_bilateral.extend([1, ] * (n_scales - n_bilateral + 1))
+
+    if type(data) is np.ndarray:  # input is an image
+        coefficients = transform(data, n_scales, bilateral=sigma_bilateral)
 
     recomposition_weights = copy.copy(weights)
     n_weights = len(recomposition_weights)
@@ -170,4 +170,4 @@ def wow(data,
 
     recon = np.sum(coefficients, axis=0)
 
-    return recon, pwr
+    return recon, coefficients

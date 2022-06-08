@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-
+import copy
 import cv2
 import numpy as np
 from scipy import special
@@ -20,7 +19,7 @@ def sdev_loc(image, kernel, variance=False):
         return np.sqrt(vari)
 
 
-def bilateral_filter(image, kernel, variance, mode="symmetric"):
+def bilateral_filter(image, kernel, variance, mode="reflect"):
 
     hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
     padded = np.pad(image, (hwy, hwx), mode=mode)
@@ -285,7 +284,12 @@ class AtrousTransform:
         C2  -4  -3  -2  -1   0   1   2   3   4
         """
 
-        def recursive_convolution(conv, s=0, dx=0, dy=0, dz=0, bilateral=bilateral):
+        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral,]*(level+1)
+        n_bilateral = len(sigma_bilateral)
+        if n_bilateral <= level:
+            sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
+
+        def recursive_convolution(conv, s=0, dx=0, dy=0, dz=0):
             """
             Recursively computes the 'à trous' convolution of the input array by
             extracting 'à trous' sub-arrays instead of using an 'à trous' kernel.
@@ -314,12 +318,8 @@ class AtrousTransform:
                              output=conv,
                              mode='mirror')
             else:
-                # A Gaussian with d=5 & sigmaSpace=1.1 approximates a B3spline
-                # conv[:] = cv2.bilateralFilter(conv, 5, bilateral*2**s, 1.1, borderType=cv2.BORDER_REFLECT)
-                # conv[:] = cv2.bilateralFilter(conv, 5, np.std(conv), 1.1, borderType=cv2.BORDER_REFLECT)
-                # # sdev = bilateral*2*np.std(conv)
-                variance = sdev_loc(conv, kernel, variance=True)
-                conv[:] = bilateral_filter(conv, kernel, variance)
+                variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
+                conv[:] = bilateral_filter(conv, kernel, variance, mode='symmetric')
 
             if conv.ndim == 2:
                 coeffs[s+1, dy::2**s, dx::2**s] = conv
@@ -349,15 +349,18 @@ class AtrousTransform:
 
         kernel = scaling_function.kernel
 
+        hwy, hwx = (kernel.shape[0]//2)*2**(level-1), (kernel.shape[1]//2)*2**(level-1)
+        arr = np.pad(arr, (hwy, hwx), mode='reflect')
+
         coeffs = np.empty((level+1,) + arr.shape, dtype=arr.dtype)
         coeffs[0] = arr
 
-        recursive_convolution(arr.copy())  # Input array is modified-> copy
+        recursive_convolution(arr)  # Input array is modified-> copy
 
         for s in range(level):  # Computes coefficients from convolved arrays
             coeffs[s] -= coeffs[s+1]
 
-        return coeffs
+        return np.copy(coeffs[:, hwy:-hwy, hwx:-hwx])
 
     @staticmethod
     def atrous_standard(arr, level, scaling_function, bilateral=None):
