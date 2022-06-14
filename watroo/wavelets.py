@@ -356,7 +356,7 @@ class AtrousTransform:
                              mode='mirror')
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
-                conv[:] = bilateral_filter(conv, kernel, variance, mode='symmetric', first=s==0)
+                conv[:] = bilateral_filter(conv, kernel, variance, mode='symmetric', first=s == 0)
 
             if conv.ndim == 2:
                 coeffs[s+1, dy::2**s, dx::2**s] = conv
