@@ -106,7 +106,7 @@ def wow(data,
 
     if type(data) is np.ndarray:  # input is an image
         if n_scales is None:
-            n_scales = int(np.log2(min(data.shape)) - 2)
+            n_scales = int(np.log2(min(data.shape)) - 1)
         transform = AtrousTransform(scaling_function)
     elif type(data) is Coefficients:  # input is already computed coefficients
         coefficients = data

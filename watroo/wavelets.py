@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
+import numexpr as ne
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
 
@@ -19,7 +20,7 @@ def sdev_loc(image, kernel, variance=False):
         return np.sqrt(vari)
 
 
-def bilateral_filter(image, kernel, variance, mode="reflect"):
+def bilateral_filter(image, kernel, variance, mode="reflect", first=False):
 
     hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
     padded = np.pad(image, (hwy, hwx), mode=mode)
@@ -32,9 +33,44 @@ def bilateral_filter(image, kernel, variance, mode="reflect"):
     y = kernel.shape[0] - 1 - y
     mask = np.ones(kernel.shape, dtype=bool)
     mask[hwy, hwx] = False
+
+    if first:
+        k = np.float32(0)
+        ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)')
     for dx, dy, k in zip(x[mask], y[mask], kernel[mask]):
         shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
-        diff = k*np.exp(-0.5*((image - shifted)**2)/variance)
+        diff = ne.re_evaluate(local_dict={'k': k, 'image':image, 'variance':variance, 'shifted':shifted})
+        # diff = k*np.exp(-0.5*((image - shifted)**2)/variance)
+        norm += diff
+        output += shifted*diff
+    return output/norm
+
+
+def atrous_bilateral_filter(image, kernel, variance, s, mode="reflect"):
+
+    hwy, hwx = (kernel.shape[0] // 2) * 2 ** s, (kernel.shape[1] // 2) * 2 ** s
+    padded = np.pad(image, (hwy, hwx), mode='reflect')
+
+    hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
+    output = kernel[hwy, hwx]*image
+    norm = np.full_like(image, kernel[hwy, hwx])
+    shifted = np.empty_like(image)
+
+    y, x, = np.indices(kernel.shape)
+    x = kernel.shape[1] - 1 - x
+    x *= 2**s
+    y = kernel.shape[0] - 1 - y
+    y *= 2**s
+    mask = np.ones(kernel.shape, dtype=bool)
+    mask[hwy, hwx] = False
+
+    for i, (dx, dy, k) in enumerate(zip(x[mask], y[mask], kernel[mask])):
+        shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
+        if s == 0 and i == 0:
+            diff = ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)')
+        else:
+            diff  = ne.re_evaluate()
+        # diff = k*np.exp(-0.5*((image - shifted)**2)/variance)
         norm += diff
         output += shifted*diff
     return output/norm
@@ -248,7 +284,7 @@ class AtrousTransform:
             raise ValueError("Unsupported number of dimensions")
 
         scaling_function = self.scaling_function_class(arr.ndim)
-        if recursive or bilateral:
+        if recursive:
             return Coefficients(
                                 self.atrous_recursive(arr,
                                                       level,
@@ -260,7 +296,8 @@ class AtrousTransform:
             return Coefficients(
                                 self.atrous_standard(arr,
                                                      level,
-                                                     scaling_function),
+                                                     scaling_function,
+                                                     bilateral=bilateral),
                                 scaling_function
             )
 
@@ -319,7 +356,7 @@ class AtrousTransform:
                              mode='mirror')
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
-                conv[:] = bilateral_filter(conv, kernel, variance, mode='symmetric')
+                conv[:] = bilateral_filter(conv, kernel, variance, mode='symmetric', first=s==0)
 
             if conv.ndim == 2:
                 coeffs[s+1, dy::2**s, dx::2**s] = conv
@@ -347,7 +384,7 @@ class AtrousTransform:
                 recursive_convolution(conv[1::2, 0::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy, dz=dz+2**s)
                 recursive_convolution(conv[1::2, 1::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy+2**s, dz=dz+2**s)
 
-        kernel = scaling_function.kernel
+        kernel = scaling_function.kernel.astype(arr.dtype)
 
         hwy, hwx = (kernel.shape[0]//2)*2**(level-1), (kernel.shape[1]//2)*2**(level-1)
         arr = np.pad(arr, (hwy, hwx), mode='reflect')
@@ -376,25 +413,35 @@ class AtrousTransform:
         scaling_function: the base scaling function.
         """
 
+        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral,]*(level+1)
+        n_bilateral = len(sigma_bilateral)
+        if n_bilateral <= level:
+            sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
+
         coeffs = np.empty((level + 1,) + arr.shape, dtype=arr.dtype)
         coeffs[0] = arr
 
         for s in range(level):  # Chained convolution
-            atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
 
-            if arr.ndim == 2:
-                cv2.filter2D(coeffs[s],
-                             -1,  # Same pixel depth as input
+            atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
+            if bilateral is None:
+                if arr.ndim == 2:
+                    cv2.filter2D(coeffs[s],
+                                 -1,  # Same pixel depth as input
+                                 atrous_kernel,
+                                 coeffs[s + 1],  # Result goes in next scale
+                                 (-1, -1),  # Anchor is kernel center
+                                 0,  # Optional offset
+                                 cv2.BORDER_REFLECT)
+                else:
+                    convolve(coeffs[s],
                              atrous_kernel,
-                             coeffs[s + 1],  # Result goes in next scale
-                             (-1, -1),  # Anchor is kernel center
-                             0,  # Optional offset
-                             cv2.BORDER_REFLECT)
+                             output=coeffs[s + 1],
+                             mode='mirror')
             else:
-                convolve(coeffs[s],
-                         atrous_kernel,
-                         output=coeffs[s + 1],
-                         mode='mirror')
+                kernel = scaling_function.kernel.astype(arr.dtype)
+                variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
+                coeffs[s+1] = atrous_bilateral_filter(coeffs[s], kernel, variance, s, mode='symmetric')
 
             coeffs[s] -= coeffs[s + 1]
 
