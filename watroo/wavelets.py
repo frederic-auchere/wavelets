@@ -8,10 +8,30 @@ import numexpr as ne
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
 
 
-def sdev_loc(image, kernel, variance=False):
-    mean2 = cv2.filter2D(image, -1, kernel, borderType=cv2.BORDER_REFLECT)
-    mean2 **= 2
-    vari = cv2.filter2D(image**2, -1, kernel, borderType=cv2.BORDER_REFLECT)
+def atrous_convolution(image, kernel, s):
+
+    hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
+    padded = np.pad(image, (hwy*2**s, hwx*2**s), mode='reflect')
+    output = np.zeros_like(image)
+    norm = np.full_like(image, kernel[hwy, hwx])
+    shifted = np.empty_like(image)
+
+    y, x = np.indices(kernel.shape)
+    x = (kernel.shape[1] - 1 - x)*2**s
+    y = (kernel.shape[0] - 1 - y)*2**s
+
+    for dx, dy, k in zip(x.flatten(), y.flatten(), kernel.flatten()):
+        output += k*padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
+    return output
+
+
+def sdev_loc(image, kernel, s=0, variance=False):
+    if s == 0:
+        mean2 = cv2.filter2D(image, -1, kernel, borderType=cv2.BORDER_REFLECT)**2
+        vari = cv2.filter2D(image**2, -1, kernel, borderType=cv2.BORDER_REFLECT)
+    else:
+        mean2 = atrous_convolution(image, kernel, s)**2
+        vari = atrous_convolution(image**2, kernel, s)
     vari -= mean2
     vari[vari <= 0] = 1e-20
     if variance:
@@ -20,60 +40,28 @@ def sdev_loc(image, kernel, variance=False):
         return np.sqrt(vari)
 
 
-def bilateral_filter(image, kernel, variance, mode="reflect", first=False):
+def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
 
     hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
     padded = np.pad(image, (hwy, hwx), mode=mode)
     output = kernel[hwy, hwx]*image
     norm = np.full_like(image, kernel[hwy, hwx])
     shifted = np.empty_like(image)
+    diff = np.empty_like(image)
 
-    y, x, = np.indices(kernel.shape)
-    x = kernel.shape[1] - 1 - x
-    y = kernel.shape[0] - 1 - y
+    y, x = np.indices(kernel.shape)
+    x = (kernel.shape[1] - 1 - x)*2**s
+    y = (kernel.shape[0] - 1 - y)*2**s
     mask = np.ones(kernel.shape, dtype=bool)
     mask[hwy, hwx] = False
 
-    if first:
-        k = np.float32(0)
-        ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)')
     for dx, dy, k in zip(x[mask], y[mask], kernel[mask]):
         shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
-        diff = ne.re_evaluate(local_dict={'k': k, 'image':image, 'variance':variance, 'shifted':shifted})
-        # diff = k*np.exp(-0.5*((image - shifted)**2)/variance)
+        ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)', out=diff)
         norm += diff
         output += shifted*diff
-    return output/norm
-
-
-def atrous_bilateral_filter(image, kernel, variance, s, mode="reflect"):
-
-    hwy, hwx = (kernel.shape[0] // 2) * 2 ** s, (kernel.shape[1] // 2) * 2 ** s
-    padded = np.pad(image, (hwy, hwx), mode='reflect')
-
-    hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
-    output = kernel[hwy, hwx]*image
-    norm = np.full_like(image, kernel[hwy, hwx])
-    shifted = np.empty_like(image)
-
-    y, x, = np.indices(kernel.shape)
-    x = kernel.shape[1] - 1 - x
-    x *= 2**s
-    y = kernel.shape[0] - 1 - y
-    y *= 2**s
-    mask = np.ones(kernel.shape, dtype=bool)
-    mask[hwy, hwx] = False
-
-    for i, (dx, dy, k) in enumerate(zip(x[mask], y[mask], kernel[mask])):
-        shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
-        if s == 0 and i == 0:
-            diff = ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)')
-        else:
-            diff  = ne.re_evaluate()
-        # diff = k*np.exp(-0.5*((image - shifted)**2)/variance)
-        norm += diff
-        output += shifted*diff
-    return output/norm
+    output /= norm
+    return output
 
 
 class Coefficients:
@@ -356,7 +344,7 @@ class AtrousTransform:
                              mode='mirror')
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
-                conv[:] = bilateral_filter(conv, kernel, variance, mode='symmetric', first=s == 0)
+                conv[:] = bilateral_filter(conv, kernel, variance, mode='symmetric')
 
             if conv.ndim == 2:
                 coeffs[s+1, dy::2**s, dx::2**s] = conv
@@ -441,7 +429,7 @@ class AtrousTransform:
             else:
                 kernel = scaling_function.kernel.astype(arr.dtype)
                 variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
-                coeffs[s+1] = atrous_bilateral_filter(coeffs[s], kernel, variance, s, mode='symmetric')
+                coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
 
             coeffs[s] -= coeffs[s + 1]
 
