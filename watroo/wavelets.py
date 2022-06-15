@@ -4,6 +4,7 @@ import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
 import numexpr as ne
+from numba import njit, prange
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
 
@@ -43,7 +44,7 @@ def sdev_loc(image, kernel, s=0, variance=False):
 def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
 
     hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
-    padded = np.pad(image, (hwy, hwx), mode=mode)
+    padded = np.pad(image, (hwy*2**s, hwx*2**s), mode=mode)
     output = kernel[hwy, hwx]*image
     norm = np.full_like(image, kernel[hwy, hwx])
     shifted = np.empty_like(image)
@@ -58,6 +59,58 @@ def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
     for dx, dy, k in zip(x[mask], y[mask], kernel[mask]):
         shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
         ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)', out=diff)
+        # diff = k*np.exp(-((image - shifted)**2)/variance/2)
+        # numba_bilateral_weight(image, shifted, variance, k, diff)
+        norm += diff
+        output += shifted*diff
+    output /= norm
+    return output
+
+
+
+@njit(parallel=True, cache=True, fastmath=True)
+def numba_bilateral_weight(image, shifted, variance, k, diff):
+    diff[:] = k * np.exp(-((image - shifted) ** 2) / variance / 2)
+
+@njit(parallel=True, cache=True, fastmath=True)
+def numba_bilateral_filter(image, padded, kernel, variance, s=0):
+
+    hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
+    output = kernel[hwy, hwx]*image
+    norm = np.full_like(image, kernel[hwy, hwx])
+
+    x = np.array([[0, 1, 2, 3, 4],
+                  [0, 1, 2, 3, 4],
+                  [0, 1, 2, 3, 4],
+                  [0, 1, 2, 3, 4],
+                  [0, 1, 2, 3, 4]])
+    y = np.array([[0, 0, 0, 0, 0],
+                  [1, 1, 1, 1, 1],
+                  [2, 2, 2, 2, 2],
+                  [3, 3, 3, 3, 3],
+                  [4, 4, 4, 4, 4]])
+
+    x = (kernel.shape[1] - 1 - x)*2**s
+    y = (kernel.shape[0] - 1 - y)*2**s
+    np.delete(x, (hwy//2, hwx//2))
+    np.delete(y, (hwy//2, hwx//2))
+    np.delete(kernel, (hwy//2, hwx//2))
+    x = x.ravel()
+    y = y.ravel()
+    kernel = kernel.ravel()
+
+    diff_l = []
+    for i in prange(len(x)):
+        dx, dy, k = x[i], y[i], kernel[i]
+        shifted = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
+        diff_l.append(k*np.exp(-((image - shifted)**2)/variance/2))
+
+    for i in prange(len(x)):
+        dx, dy, k = x[i], y[i], kernel[i]
+        shifted = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
+        diff = diff_l[i]
+        # diff = k*np.exp(-((image - shifted)**2)/variance/2)
+        # diff = numba_bilateral_weight(image, shifted, k, variance)
         norm += diff
         output += shifted*diff
     output /= norm
@@ -429,8 +482,10 @@ class AtrousTransform:
             else:
                 kernel = scaling_function.kernel.astype(arr.dtype)
                 variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
-                coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
-
+                # coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
+                hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
+                padded = np.pad(coeffs[s], (hwy*2**s, hwx*2**s), mode='symmetric')
+                coeffs[s + 1] = numba_bilateral_filter(coeffs[s], padded, kernel, variance, s=s)
             coeffs[s] -= coeffs[s + 1]
 
         return coeffs
