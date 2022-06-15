@@ -43,7 +43,7 @@ def sdev_loc(image, kernel, s=0, variance=False):
 def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
 
     hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
-    padded = np.pad(image, (hwy, hwx), mode=mode)
+    padded = np.pad(image, (hwy*2**s, hwx*2**s), mode=mode)
     output = kernel[hwy, hwx]*image
     norm = np.full_like(image, kernel[hwy, hwx])
     shifted = np.empty_like(image)
