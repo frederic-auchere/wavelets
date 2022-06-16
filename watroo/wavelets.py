@@ -83,10 +83,14 @@ def numba_bilateral_filter(image, kernel, variance, s, out):
     for j in range(variance.shape[0]):
         for i in range(variance.shape[1]):
             summ = 0
+            norm = 0
             for jk in range(kernel.shape[0]):
                 for ik in range(kernel.shape[1]):
-                    summ += kernel[jk, ik]*image[hwy*s2 + j - (jk - hwy)*s2, hwx*s2 + i - (ik - hwx)*s2]
-            out[j, i] = summ
+                    img = image[hwy*s2 + j - (jk - hwy)*s2, hwx*s2 + i - (ik - hwx)*s2]
+                    diff = kernel[jk, ik]*np.exp(-((image[hwy*s2 + j, hwy*s2 + i] - img)**2)/variance[j, i]/2)
+                    norm += diff
+                    summ += img*diff
+            out[j, i] = summ/norm
 
 
 class Coefficients:
