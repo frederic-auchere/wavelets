@@ -60,37 +60,41 @@ def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
         shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
         ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)', out=diff)
         # diff = k*np.exp(-((image - shifted)**2)/variance/2)
-        # diff[:] = numba_bilateral_weight(image, shifted, variance, k)
         norm += diff
         shifted *= diff
         output += shifted
     output /= norm
     return output
 
-@njit(parallel=True, cache=True, fastmath=True, nogil=True)
-def numba_bilateral_weight(image, shifted, variance, k):
-    return k * np.exp(-((image - shifted) ** 2) / variance / 2)
-
-# @njit(parallel=True, cache=True, fastmath=True)
-@guvectorize([(float32[:,:], float32[:,:], float32[:,:], float32, float32[:,:])],
-             '(n,n),(m,m),(l,l),()->(l,l)', nopython=True)
+@njit(parallel=True, cache=True)
+# @guvectorize([(float32[:,:], float32[:,:], float32[:,:], float32, float32[:,:])],
+#              '(n,n),(m,m),(l,l),()->(l,l)', nopython=True, parallel=True)
 def numba_bilateral_filter(image, kernel, variance, s, out):
 
     hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
-
     s2 = int(2**s)
+    hwy *= s2
+    hwx *= s2
 
-    for j in range(variance.shape[0]):
-        for i in range(variance.shape[1]):
-            summ = 0
-            norm = 0
+    for j in prange(variance.shape[0]):
+        for i in prange(variance.shape[1]):
+
+            # atrous = image[j:j+2*hwy+1:s2, i:i+2*hwx+1:s2]
+            # diff = kernel*np.exp(-(image[hwy + j, hwy + i] - atrous)**2/variance[j, i]/2)
+            # norm = np.sum(diff)
+            # conv = np.sum(diff*atrous)
+            conv, norm = 0, 0
+            v2 = -2*variance[j, i]
             for jk in range(kernel.shape[0]):
+                nj = j - jk*s2 + hwy*2
                 for ik in range(kernel.shape[1]):
-                    img = image[hwy*s2 + j - (jk - hwy)*s2, hwx*s2 + i - (ik - hwx)*s2]
-                    diff = kernel[jk, ik]*np.exp(-((image[hwy*s2 + j, hwy*s2 + i] - img)**2)/variance[j, i]/2)
+                    ni = i - ik*s2 + hwx*2
+                    # if nj >= 0 and nj < image.shape[0] and ni >= 0 and ni < image.shape[1]:
+                    diff = kernel[jk, ik]*np.exp(((image[hwy + j, hwy + i] - image[nj, ni])**2)/v2)
                     norm += diff
-                    summ += img*diff
-            out[j, i] = summ/norm
+                    conv += image[nj, ni]*diff
+            # # if norm > 0:
+            out[j, i] = conv / norm
 
 
 class Coefficients:
@@ -461,7 +465,7 @@ class AtrousTransform:
                 # coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
                 hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
                 padded = np.pad(coeffs[s], (hwy*2**s, hwx*2**s), mode='symmetric')
-                coeffs[s + 1] = numba_bilateral_filter(padded, kernel, variance, int(s))
+                numba_bilateral_filter(padded, kernel, variance, int(s), coeffs[s + 1])
             coeffs[s] -= coeffs[s + 1]
 
         return coeffs
