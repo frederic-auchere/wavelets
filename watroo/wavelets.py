@@ -66,7 +66,7 @@ def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
     output /= norm
     return output
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True, cache=True, fastmath=True)
 # @guvectorize([(float32[:,:], float32[:,:], float32[:,:], float32, float32[:,:])],
 #              '(n,n),(m,m),(l,l),()->(l,l)', nopython=True, parallel=True)
 def numba_bilateral_filter(image, kernel, variance, s, out):
@@ -86,11 +86,15 @@ def numba_bilateral_filter(image, kernel, variance, s, out):
             conv, norm = 0, 0
             v2 = -2*variance[j, i]
             for jk in range(kernel.shape[0]):
-                nj = j - jk*s2 + hwy*2
+                nj = j - jk*s2 + hwy
+                if nj < 0: nj += image.shape[0]
+                if nj >= image.shape[0]: nj -= image.shape[0]
                 for ik in range(kernel.shape[1]):
-                    ni = i - ik*s2 + hwx*2
+                    ni = i - ik*s2 + hwx
                     # if nj >= 0 and nj < image.shape[0] and ni >= 0 and ni < image.shape[1]:
-                    diff = kernel[jk, ik]*np.exp(((image[hwy + j, hwy + i] - image[nj, ni])**2)/v2)
+                    if ni < 0: ni += image.shape[1]
+                    if ni >= image.shape[0]: ni -= image.shape[0]
+                    diff = kernel[jk, ik]*np.exp(((image[j, i] - image[nj, ni])**2)/v2)
                     norm += diff
                     conv += image[nj, ni]*diff
             # # if norm > 0:
@@ -462,10 +466,10 @@ class AtrousTransform:
             else:
                 kernel = scaling_function.kernel.astype(arr.dtype)
                 variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
-                # coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
-                hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
-                padded = np.pad(coeffs[s], (hwy*2**s, hwx*2**s), mode='symmetric')
-                numba_bilateral_filter(padded, kernel, variance, int(s), coeffs[s + 1])
+                coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
+                # hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
+                # padded = np.pad(coeffs[s], (hwy*2**s, hwx*2**s), mode='symmetric')
+                # numba_bilateral_filter(coeffs[s], kernel, variance, int(s), coeffs[s + 1])
             coeffs[s] -= coeffs[s + 1]
 
         return coeffs
