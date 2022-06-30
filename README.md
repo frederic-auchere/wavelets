@@ -5,6 +5,20 @@ Implements several of the concepts described in:
 J.-L. Starck & F. Murtagh, Handbook of Astronomical Data 
 Analysis, Springer-Verlag
 
+## Installation
+
+From the active environment
+
+    python setup.py install
+
+or
+
+    pip install .
+
+or if you want to be able to edit & develop (requires reloading the package)
+
+    pip install -e .
+
 ## Scaling functions
 
 ### Triangle
@@ -58,16 +72,20 @@ The same result cam be obtained using the *denoise* convenience function
 This returns a 1-D ndarray containing the normalization
 used to estimate the significance of coefficients.
 
-## Installation
+## WOW! (Wavelets Optimized Whitening)
 
-From the active environment
+    from watroo import wow
+    # read in your image here (must be flating point)
+    # ...
 
-    python setup.py install
+Standard enhancement    
 
-or
+    wow_image = wow(image)
 
-    pip install .
+'bilateral' version, slower but better
 
-or if you want to be able to edit & develop (requires reloading the package)
+    wow_image = wow(image, bilateral=1)
 
-    pip install -e .
+Denoised bilateral enhancement (best results)
+
+    wow_image = wow(image, bilateral=1, denoise_coefficients=[5, 2])
