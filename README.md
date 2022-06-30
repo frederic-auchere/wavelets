@@ -80,12 +80,12 @@ used to estimate the significance of coefficients.
 
 Standard enhancement    
 
-    wow_image = wow(image)
+    wow_image, _ = wow(image)
 
 'bilateral' version, slower but better
 
-    wow_image = wow(image, bilateral=1)
+    wow_image, _ = wow(image, bilateral=1)
 
 Denoised bilateral enhancement (best results)
 
-    wow_image = wow(image, bilateral=1, denoise_coefficients=[5, 2])
+    wow_image, _ = wow(image, bilateral=1, denoise_coefficients=[5, 2])
