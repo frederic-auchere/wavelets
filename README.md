@@ -75,10 +75,10 @@ used to estimate the significance of coefficients.
 ## WOW! (Wavelets Optimized Whitening)
 
     from watroo import wow
-    # read in your image here (must be flating point)
+    # read in your image here (must be floating point)
     # ...
 
-Standard enhancement    
+Standard enhancement
 
     wow_image, _ = wow(image)
 
