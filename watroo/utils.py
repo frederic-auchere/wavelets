@@ -79,7 +79,7 @@ def enhance(*args, weights=None, denoise=None, soft_threshold=True, out=None, **
     return out
 
 
-def denoise(data, scaling_function, weights, soft_threshold=True):
+def denoise(data, scaling_function, weights, noise=None, soft_threshold=True):
     """
     Convenience function to denoise a data array
     :param data: ndarray-like, the data to denoise
@@ -90,6 +90,7 @@ def denoise(data, scaling_function, weights, soft_threshold=True):
     """
     transform = AtrousTransform(scaling_function)
     coefficients = transform(data, len(weights))
+    coefficients.noise = noise
     coefficients.denoise(weights, soft_threshold=soft_threshold)
     return np.sum(coefficients, axis=0)
 

@@ -1,9 +1,7 @@
 # WATROO
 
-Implements several of the concepts described in:
+Implements the à trous wavelet transform and associated tools: denoising, enhancement, etc.
 
-J.-L. Starck & F. Murtagh, Handbook of Astronomical Data 
-Analysis, Springer-Verlag
 
 ## Installation
 
@@ -19,17 +17,15 @@ or if you want to be able to edit & develop (requires reloading the package)
 
     pip install -e .
 
+## 'A trous' transform
+
+ATrousTransform implements a dyadic 'à-trous' transform
+
 ## Scaling functions
 
 ### Triangle
 
 ### B3 spline
-
-## 'A trous' transform
-
-ATrousTransform implements a dyadic 'à-trous' transform
-
-## Utils
 
 ## Examples
 
@@ -89,3 +85,8 @@ Standard enhancement
 Denoised bilateral enhancement (best results)
 
     wow_image, _ = wow(image, bilateral=1, denoise_coefficients=[5, 2])
+
+## References
+
+J.-L. Starck & F. Murtagh, Handbook of Astronomical Data 
+Analysis, Springer-Verlag
