@@ -106,6 +106,8 @@ def wow(data,
         preserve_variance=False):
 
     if type(data) is np.ndarray:  # input is an image
+        if data.dtype is np.int32 or data.dtype is np.int64 or data.dtype == '>f4':
+            data = np.float64(data)
         if n_scales is None:
             n_scales = int(np.log2(min(data.shape)) - 1)
         transform = AtrousTransform(scaling_function)
