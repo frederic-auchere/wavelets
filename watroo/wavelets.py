@@ -4,6 +4,7 @@ import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
 import numexpr as ne
+from tqdm import tqdm
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
 
@@ -66,9 +67,10 @@ def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
 
 class Coefficients:
 
-    def __init__(self, data, scaling_function):
+    def __init__(self, data, scaling_function, bilateral=None):
         self.data = data
         self.scaling_function = scaling_function
+        self.bilateral = bilateral
         self.noise = None
 
     def __len__(self):
@@ -77,16 +79,19 @@ class Coefficients:
     def __array__(self):
         return self.data
 
+    @property
+    def sigma_e(self):
+        return self.scaling_function.sigma_e(bilateral=self.bilateral)
+
     def get_noise(self):
-        sigma_e = self.scaling_function.sigma_e[0]
-        return np.median(np.abs(self.data[0])) / 0.6745 / sigma_e
+        return np.median(np.abs(self.data[0])) / 0.6745 / self.sigma_e[0]
 
     def significance(self, sigma, scale, soft_threshold=True):
         if self.noise is None:
             self.noise = self.get_noise()
             if self.noise == 0:
                 return np.ones_like(self.data[0])
-        sigma_e = self.scaling_function.sigma_e[scale]
+        sigma_e = self.sigma_e[scale]
         if soft_threshold:
             if sigma != 0:
                 r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))
@@ -147,17 +152,27 @@ class AbstractScalingFunction:
 
         return kernel
 
-    @property
-    def sigma_e(self):
-        if self.n_dim == 1:
-            sigma_e = self.sigma_e_1d
-        elif self.n_dim == 2:
-            sigma_e = self.sigma_e_2d
-        elif self.n_dim == 3:
-            sigma_e = self.sigma_e_3d
+    def sigma_e(self, bilateral=None):
+        if bilateral is None:
+            if self.n_dim == 1:
+                sigma_e = self.sigma_e_1d
+            elif self.n_dim == 2:
+                sigma_e = self.sigma_e_2d
+            elif self.n_dim == 3:
+                sigma_e = self.sigma_e_3d
+            else:
+                raise ValueError("Unsupported number of dimensions")
+            return sigma_e
         else:
-            raise ValueError("Unsupported number of dimensions")
-        return sigma_e
+            if self.n_dim == 1:
+                sigma_e = self.sigma_e_1d_bilateral
+            elif self.n_dim == 2:
+                sigma_e = self.sigma_e_2d_bilateral
+            elif self.n_dim == 3:
+                sigma_e = self.sigma_e_3d_bilateral
+            else:
+                raise ValueError("Unsupported number of dimensions")
+            return sigma_e
 
     @property
     def sigma_e_1d(self):
@@ -171,12 +186,24 @@ class AbstractScalingFunction:
     def sigma_e_3d(self):
         raise NotImplementedError
 
-    def compute_noise_weights(self, n_scales, n_trials=100):
+    @property
+    def sigma_e_1d_bilateral(self):
+        raise NotImplementedError
+
+    @property
+    def sigma_e_2d_bilateral(self):
+        raise NotImplementedError
+
+    @property
+    def sigma_e_3d_bilateral(self):
+        raise NotImplementedError
+
+    def compute_noise_weights(self, n_scales, n_trials=100, bilateral=None):
         transform = AtrousTransform(self.__class__)
         std = np.zeros(n_scales)
-        for i in range(n_trials):
+        for i in tqdm(range(n_trials)):
             data = np.random.normal(size=(2**n_scales,)*self.n_dim).astype(np.float32)
-            coefficients = transform(data, n_scales)
+            coefficients = transform(data, n_scales, bilateral=bilateral)
             std += coefficients.data[:-1].std(axis=tuple(range(1, self.n_dim+1)))
         std /= n_trials
         return std
@@ -215,7 +242,7 @@ class Triangle(AbstractScalingFunction):
 
 
 class B3spline(AbstractScalingFunction):
-    """"
+    """
     B3spline scaling function
     See appendix A of J.-L. Starck & F. Murtagh, Handbook of Astronomical Data
     Analysis, Springer-Verlag
@@ -245,6 +272,11 @@ class B3spline(AbstractScalingFunction):
     def sigma_e_3d(self):
         return np.array([0.95633954, 0.12491933, 0.03933029, 0.01489642, 0.0064108])
 
+    @property
+    def sigma_e_2d_bilateral(self):
+        return np.array([0.38234752, 0.24305799, 0.16012153, 0.10633541, 0.07083733,
+                         0.04728659, 0.03163678, 0.02122341, 0.01429102, 0.00952376])
+
 
 class AtrousTransform:
     """
@@ -253,13 +285,14 @@ class AtrousTransform:
     Astronomical Data Analysis, Springer-Verlag
     """""
 
-    def __init__(self, scaling_function_class=B3spline):
+    def __init__(self, scaling_function_class=B3spline, bilateral=None):
         """
         scaling_function: the base scaling function. The default is a b3spline.
         """
         self.scaling_function_class = scaling_function_class
+        self.bilateral = bilateral
 
-    def __call__(self, arr, level, recursive=False, bilateral=None):
+    def __call__(self, arr, level, recursive=False):
         """
         Performs the 'à trous' transform.
         Uses either a recursive algorithm or a standard algorithm.
@@ -276,21 +309,20 @@ class AtrousTransform:
             return Coefficients(
                                 self.atrous_recursive(arr,
                                                       level,
-                                                      scaling_function,
-                                                      bilateral=bilateral),
+                                                      scaling_function),
                                 scaling_function,
+                                self.bilateral
             )
         else:
             return Coefficients(
                                 self.atrous_standard(arr,
                                                      level,
-                                                     scaling_function,
-                                                     bilateral=bilateral),
-                                scaling_function
+                                                     scaling_function),
+                                scaling_function,
+                                self.bilateral
             )
 
-    @staticmethod
-    def atrous_recursive(arr, level, scaling_function, bilateral=None):
+    def atrous_recursive(self, arr, level, scaling_function):
         """
         Performs 'à trous' wavelet transform of input array arr over level scales,
         as described in Appendix A of J.-L. Starck & F. Murtagh, Handbook of
@@ -309,7 +341,7 @@ class AtrousTransform:
         C2  -4  -3  -2  -1   0   1   2   3   4
         """
 
-        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral,]*(level+1)
+        sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ]*(level+1)
         n_bilateral = len(sigma_bilateral)
         if n_bilateral <= level:
             sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
@@ -328,7 +360,7 @@ class AtrousTransform:
             s=0: current scale at which the convolution is performed
             dx=0, dy=0: current offsets of the sub-array
             """
-            if bilateral is None:
+            if self.bilateral is None:
                 if conv.ndim == 2:
                     cv2.filter2D(conv,
                                  -1,        # Same pixel depth as input
@@ -387,8 +419,7 @@ class AtrousTransform:
 
         return np.copy(coeffs[:, hwy:-hwy, hwx:-hwx])
 
-    @staticmethod
-    def atrous_standard(arr, level, scaling_function, bilateral=None):
+    def atrous_standard(self, arr, level, scaling_function):
         """
         Performs 'à trous' wavelet transform of input array arr over level scales,
         as described in Appendix A of J.-L. Starck & F. Murtagh, Handbook of
@@ -401,7 +432,7 @@ class AtrousTransform:
         scaling_function: the base scaling function.
         """
 
-        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral,]*(level+1)
+        sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ]*(level+1)
         n_bilateral = len(sigma_bilateral)
         if n_bilateral <= level:
             sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
@@ -412,7 +443,7 @@ class AtrousTransform:
         for s in range(level):  # Chained convolution
 
             atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
-            if bilateral is None:
+            if self.bilateral is None:
                 if arr.ndim == 2:
                     cv2.filter2D(coeffs[s],
                                  -1,  # Same pixel depth as input
