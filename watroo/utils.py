@@ -103,14 +103,17 @@ def wow(data,
         denoise_coefficients=[],
         bilateral=None,
         soft_threshold=True,
-        preserve_variance=False):
+        preserve_variance=False,
+        gamma=3.2,
+        gamma_min=None,
+        gamma_max=None,
+        h=0):
 
     if type(data) is np.ndarray:  # input is an image
         if data.dtype is np.int32 or data.dtype is np.int64 or data.dtype == '>f4':
             data = np.float64(data)
         if n_scales is None:
             n_scales = int(np.log2(min(data.shape)) - 1)
-        transform = AtrousTransform(scaling_function)
     elif type(data) is Coefficients:  # input is already computed coefficients
         coefficients = data
         n_scales = len(coefficients)-1
@@ -126,7 +129,11 @@ def wow(data,
             sigma_bilateral.extend([1, ] * (n_scales - n_bilateral + 1))
 
     if type(data) is np.ndarray:  # input is an image
-        coefficients = transform(data, n_scales, bilateral=sigma_bilateral)
+        transform = AtrousTransform(scaling_function, bilateral=sigma_bilateral)
+        coefficients = transform(data, n_scales)
+
+    if h > 0:
+        gamma_scaled = np.zeros_like(coefficients.data[0])
 
     recomposition_weights = copy.copy(weights)
     n_weights = len(recomposition_weights)
@@ -142,10 +149,9 @@ def wow(data,
 
     pwr = []
     local_power = np.empty_like(coefficients.data[0])
-    for s, (c, w, d, se) in enumerate(zip(coefficients.data,
-                                          recomposition_weights,
-                                          scale_denoise_coefficients,
-                                          coefficients.scaling_function.sigma_e)):
+    for s, (c, w, d) in enumerate(zip(coefficients.data,
+                                      recomposition_weights,
+                                      scale_denoise_coefficients)):
         power = c**2
         if preserve_variance:
             if s == n_scales:
@@ -168,9 +174,21 @@ def wow(data,
             else:
                 local_power = 1
             c *= coefficients.significance(d, s, soft_threshold=soft_threshold)
+        if h > 0:
+            gamma_scaled += c
         pwr.append(local_power)
         c *= w*power_norm/pwr[s]
 
     recon = np.sum(coefficients, axis=0)
+
+    if h > 0:
+        if gamma_min is None:
+            gamma_min = data.min()
+        if gamma_max is None:
+            gamma_max = data.max()
+        gamma_scaled -= gamma_min
+        gamma_scaled /= gamma_max - gamma_min
+        gamma_scaled **= gamma
+        recon = (1 - h)*recon + h*gamma_scaled
 
     return recon, coefficients
