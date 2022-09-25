@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import cv2
+import warnings
 from . import AtrousTransform, B3spline, Coefficients
 
 __all__ = ['denoise', 'wow']
@@ -119,6 +120,11 @@ def wow(data,
         n_scales = len(coefficients)-1
     else:
         raise ValueError('Unknown input type')
+
+    max_scales = len(scaling_function(2).sigma_e(bilateral=bilateral))
+    if n_scales > max_scales:
+        warnings.warn(f'Reqquired number of scales lager then the maximum for scaling function. Using {max_scales}.')
+        n_scales = max_scales
 
     if bilateral is None:
         sigma_bilateral = None

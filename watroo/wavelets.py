@@ -285,12 +285,13 @@ class AtrousTransform:
     Astronomical Data Analysis, Springer-Verlag
     """""
 
-    def __init__(self, scaling_function_class=B3spline, bilateral=None):
+    def __init__(self, scaling_function_class=B3spline, bilateral=None, bilateral_scaling=True):
         """
         scaling_function: the base scaling function. The default is a b3spline.
         """
         self.scaling_function_class = scaling_function_class
         self.bilateral = bilateral
+        self.bilateral_scaling = bilateral_scaling
 
     def __call__(self, arr, level, recursive=False):
         """
@@ -458,8 +459,10 @@ class AtrousTransform:
                              output=coeffs[s + 1],
                              mode='mirror')
             else:
-                kernel = scaling_function.kernel.astype(arr.dtype)
                 variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
+                if bilateral_scaling:
+                    variance *= s+1
+                kernel = scaling_function.kernel.astype(arr.dtype)
                 coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
 
             coeffs[s] -= coeffs[s + 1]
