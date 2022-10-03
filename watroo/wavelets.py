@@ -38,6 +38,7 @@ def atrous_convolution(image, kernel, s):
 
 def sdev_loc(image, kernel, s=0, variance=False):
     if s == 0:
+        cv2.filter2D(image, -1, kernel, borderType=cv2.BORDER_REFLECT)
         mean2 = cv2.filter2D(image, -1, kernel, borderType=cv2.BORDER_REFLECT)**2
         vari = cv2.filter2D(image**2, -1, kernel, borderType=cv2.BORDER_REFLECT)
     else:

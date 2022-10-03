@@ -19,6 +19,7 @@ VERSION = '0.0.1'
 REQUIRED = [
     'scipy',
     'numpy',
+    'numexpr',
     'opencv-python'
 ]
 
