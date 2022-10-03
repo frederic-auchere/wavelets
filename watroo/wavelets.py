@@ -6,7 +6,17 @@ from scipy.ndimage import convolve
 import numexpr as ne
 from tqdm import tqdm
 
-__all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients']
+__all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe']
+
+
+def generalized_anscombe(signal, alpha=1, g=0, sigma=0, inverse=False):
+
+    if inverse:
+        return ((alpha*signal/2)**2 + alpha*g - sigma**2 - 3*alpha/8)/alpha
+    else:
+        dum = alpha*signal + 3*alpha**2/8 + sigma**2 - alpha*g
+        dum[dum <= 0] = 0
+        return 2*np.sqrt(dum)/alpha
 
 
 def atrous_convolution(image, kernel, s):
@@ -96,7 +106,7 @@ class Coefficients:
             if sigma != 0:
                 r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))
                 return special.erf(r / np.sqrt(2))
-#                return r / (1 + r)
+                # return r / (1 + r)
             else:
                 return 1
         else:
@@ -114,14 +124,18 @@ class AbstractScalingFunction:
     Abstract class for scaling functions
     """
 
+    coefficients_1d = None
+    sigma_e_1d = None
+    sigma_e_2d = None
+    sigma_e_3d = None
+    sigma_e_1d_bilateral = None
+    sigma_e_2d_bilateral = None
+    sigma_e_3d_bilateral = None
+
     def __init__(self, name, n_dim):
         self.name = name
         self.n_dim = n_dim
         self.kernel = self.make_kernel()
-
-    @property
-    def coefficients_1d(self):
-        raise NotImplementedError
 
     @property
     def coefficients_2d(self):
@@ -174,36 +188,12 @@ class AbstractScalingFunction:
                 raise ValueError("Unsupported number of dimensions")
             return sigma_e
 
-    @property
-    def sigma_e_1d(self):
-        raise NotImplementedError
-
-    @property
-    def sigma_e_2d(self):
-        raise NotImplementedError
-
-    @property
-    def sigma_e_3d(self):
-        raise NotImplementedError
-
-    @property
-    def sigma_e_1d_bilateral(self):
-        raise NotImplementedError
-
-    @property
-    def sigma_e_2d_bilateral(self):
-        raise NotImplementedError
-
-    @property
-    def sigma_e_3d_bilateral(self):
-        raise NotImplementedError
-
     def compute_noise_weights(self, n_scales, n_trials=100, bilateral=None):
-        transform = AtrousTransform(self.__class__)
+        transform = AtrousTransform(self.__class__, bilateral=bilateral)
         std = np.zeros(n_scales)
         for i in tqdm(range(n_trials)):
             data = np.random.normal(size=(2**n_scales,)*self.n_dim).astype(np.float32)
-            coefficients = transform(data, n_scales, bilateral=bilateral)
+            coefficients = transform(data, n_scales)
             std += coefficients.data[:-1].std(axis=tuple(range(1, self.n_dim+1)))
         std /= n_trials
         return std
@@ -216,29 +206,21 @@ class Triangle(AbstractScalingFunction):
     Analysis, Springer-Verlag
     """
 
+    coefficients_1d = np.array([1/4, 1/2, 1/4])
+
+    sigma_e_1d = np.array([0.60840933, 0.33000059, 0.21157957, 0.145824, 0.10158388,
+                           0.07155912, 0.04902655, 0.03529812, 0.02409187, 0.01722846,
+                           0.01144442])
+
+    sigma_e_2d = np.array([0.7999247, 0.27308452, 0.11998217, 0.05793947, 0.0288104,
+                           0.01447795, 0.00733832, 0.0037203, 0.00192882, 0.00098568,
+                           0.00048533])
+
+    sigma_e_3d = np.array([0.89736751, 0.19514386, 0.06239262, 0.02311278, 0.00939645])
+
     def __init__(self, *args, **kwargs):
         super().__init__('triangle',
                          *args, **kwargs)
-
-    @property
-    def coefficients_1d(self):
-        return np.array([1/4, 1/2, 1/4])
-
-    @property
-    def sigma_e_1d(self):
-        return np.array([0.60840933, 0.33000059, 0.21157957, 0.145824, 0.10158388,
-                         0.07155912, 0.04902655, 0.03529812, 0.02409187, 0.01722846,
-                         0.01144442])
-
-    @property
-    def sigma_e_2d(self):
-        return np.array([0.7999247, 0.27308452, 0.11998217, 0.05793947, 0.0288104,
-                         0.01447795, 0.00733832, 0.0037203, 0.00192882, 0.00098568,
-                         0.00048533])
-
-    @property
-    def sigma_e_3d(self):
-        return np.array([0.89736751, 0.19514386, 0.06239262, 0.02311278, 0.00939645])
 
 
 class B3spline(AbstractScalingFunction):
@@ -248,34 +230,24 @@ class B3spline(AbstractScalingFunction):
     Analysis, Springer-Verlag
     """
 
+    coefficients_1d = np.array([1/16, 1/4, 3/8, 1/4, 1/16])
+
+    sigma_e_1d = np.array([0.72514976, 0.28538683, 0.17901161, 0.12222841, 0.08469601,
+                           0.06027006, 0.04242257, 0.02919823, 0.01805671, 0.01383672,
+                           0.00943623])
+
+    sigma_e_2d = np.array([8.907e-01, 2.0072e-01, 8.5551e-02, 4.1261e-02, 2.0470e-02,
+                           1.0232e-02, 5.1435e-03, 2.6008e-03, 1.3161e-03, 6.7359e-04,
+                           4.0040e-04])
+
+    sigma_e_3d = np.array([0.95633954, 0.12491933, 0.03933029, 0.01489642, 0.0064108])
+
+    sigma_e_2d_bilateral = np.array([0.38234752, 0.24305799, 0.16012153, 0.10633541, 0.07083733,
+                                     0.04728659, 0.03163678, 0.02122341, 0.01429102, 0.00952376])
+
     def __init__(self, *args, **kwargs):
         super().__init__('b3spline',
                          *args, **kwargs)
-
-    @property
-    def coefficients_1d(self):
-        return np.array([1/16, 1/4, 3/8, 1/4, 1/16])
-
-    @property
-    def sigma_e_1d(self):
-        return np.array([0.72514976, 0.28538683, 0.17901161, 0.12222841, 0.08469601,
-                         0.06027006, 0.04242257, 0.02919823, 0.01805671, 0.01383672,
-                         0.00943623])
-
-    @property
-    def sigma_e_2d(self):
-        return np.array([8.907e-01, 2.0072e-01, 8.5551e-02, 4.1261e-02, 2.0470e-02,
-                         1.0232e-02, 5.1435e-03, 2.6008e-03, 1.3161e-03, 6.7359e-04,
-                         4.0040e-04])
-
-    @property
-    def sigma_e_3d(self):
-        return np.array([0.95633954, 0.12491933, 0.03933029, 0.01489642, 0.0064108])
-
-    @property
-    def sigma_e_2d_bilateral(self):
-        return np.array([0.38234752, 0.24305799, 0.16012153, 0.10633541, 0.07083733,
-                         0.04728659, 0.03163678, 0.02122341, 0.01429102, 0.00952376])
 
 
 class AtrousTransform:
