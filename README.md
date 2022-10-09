@@ -4,10 +4,11 @@ Implements the _à trous_ wavelet transform and associated tools: denoising, enh
 
 # Table of contents
 
-[Installation](#Installation)
-[_A trous_ transform](#_A trous_ transform)
-[WOW! (Wavelets Optimized Whitening)](#WOW! (Wavelets Optimized Whitening))
-[References](#References)
+[Installation](#installation)
+[_A trous_ transform](#a-trous-transform)
+[Scaling functions](#scaling-functions)
+[WOW! (Wavelets Optimized Whitening)](#wow-wavelets-optimized-whitening))
+[References](#references)
 
 ## Installation
 
