@@ -1,7 +1,13 @@
 # WATROO
 
-Implements the à trous wavelet transform and associated tools: denoising, enhancement, etc.
+Implements the _à trous_ wavelet transform and associated tools: denoising, enhancement, etc.
 
+# Table of contents
+
+[Installation](#Installation)
+[_A trous_ transform](#_A trous_ transform)
+[WOW! (Wavelets Optimized Whitening)](#WOW! (Wavelets Optimized Whitening))
+[References](#References)
 
 ## Installation
 
@@ -17,7 +23,7 @@ or if you want to be able to edit & develop (requires reloading the package)
 
     pip install -e .
 
-## 'A trous' transform
+## _A trous_ transform
 
 ATrousTransform implements a dyadic 'à-trous' transform
 
