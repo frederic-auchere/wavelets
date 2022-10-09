@@ -2,7 +2,7 @@
 
 Implements the _à trous_ wavelet transform and associated tools: denoising, enhancement, etc.
 
-# Table of contents
+# Contents
 
 [Installation](#installation)\
 [_A trous_ transform](#a-trous-transform)\
@@ -95,5 +95,5 @@ Denoised bilateral enhancement (best results)
 
 ## References
 
-J.-L. Starck & F. Murtagh, Handbook of Astronomical Data 
-Analysis, Springer-Verlag
+Starck, J.-L. & Murtagh, F. 2002, Handbook of Astronomical Data Analysis, Springer-Verlag
+Auchère, F., Soubrié, E., Pelouze, G., Buchlin, E. 2022, Image Enhancement With Wavelets Optimized Whitening, A&A, submitted 
