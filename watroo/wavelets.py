@@ -240,6 +240,11 @@ class Triangle(AbstractScalingFunction):
 
     sigma_e_3d = np.array([0.89736751, 0.19514386, 0.06239262, 0.02311278, 0.00939645])
 
+    sigma_e_2d_bilateral = np.array([0.31063172, 0.34575647, 0.23712331, 0.13559906, 0.07172004, 0.03665405,
+                                     0.01850046, 0.00928768, 0.00465967, 0.00234445, 0.00119249])
+
+    sigma_e_3d_bilateral = np.array([0.3828863, 0.36182913, 0.19520299, 0.08498861, 0.03363142])
+
     def __init__(self, *args, **kwargs):
         super().__init__('triangle',
                          *args, **kwargs)
