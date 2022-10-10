@@ -54,11 +54,13 @@ def convolution(arr, kernel, output=None):
                  output=output,
                  mode='mirror')
 
+    return output
+
 
 def sdev_loc(image, kernel, s=0, variance=False):
     if s == 0:
-        mean2 = cv2.filter2D(image, -1, kernel, borderType=cv2.BORDER_REFLECT)**2
-        vari = cv2.filter2D(image**2, -1, kernel, borderType=cv2.BORDER_REFLECT)
+        mean2 = convolution(image, kernel)**2
+        vari = convolution(image**2, kernel)
     else:
         mean2 = atrous_convolution(image, kernel, s)**2
         vari = atrous_convolution(image**2, kernel, s)
@@ -72,21 +74,22 @@ def sdev_loc(image, kernel, s=0, variance=False):
 
 def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
 
-    hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
-    padded = np.pad(image, (hwy*2**s, hwx*2**s), mode=mode)
-    output = kernel[hwy, hwx]*image
-    norm = np.full_like(image, kernel[hwy, hwx])
+    half_widths = tuple([s//2 for s in kernel.shape])  # z, y, x order
+    padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
+    output = kernel[half_widths]*image
+    norm = np.full_like(image, kernel[half_widths])
+
     shifted = np.empty_like(image)
     diff = np.empty_like(image)
 
-    y, x = np.indices(kernel.shape)
-    x = (kernel.shape[1] - 1 - x)*2**s
-    y = (kernel.shape[0] - 1 - y)*2**s
+    indices = np.indices(kernel.shape)  # z, y, x order
     mask = np.ones(kernel.shape, dtype=bool)
-    mask[hwy, hwx] = False
+    mask[half_widths] = False
+    indices = [(shape - 1 - index[mask])*2**s for index, shape in zip(indices, kernel.shape)]
 
-    for dx, dy, k in zip(x[mask], y[mask], kernel[mask]):
-        shifted[:] = padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
+    for *deltas, k in zip(*indices, kernel[mask]):
+        slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
+        shifted[:] = padded[slc]
         ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)', out=diff)
         norm += diff
         output += shifted*diff
