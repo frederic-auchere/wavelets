@@ -1,21 +1,38 @@
 # WATROO
 
-Implements several of the concepts described in:
+Implements the _à trous_ wavelet transform and associated tools: denoising, enhancement, etc.
 
-J.-L. Starck & F. Murtagh, Handbook of Astronomical Data 
-Analysis, Springer-Verlag
+# Contents
+
+[Installation](#installation)\
+[_A trous_ transform](#a-trous-transform)\
+[Scaling functions](#scaling-functions)\
+[WOW! (Wavelets Optimized Whitening)](#wow-wavelets-optimized-whitening)\
+[References](#references)
+
+## Installation
+
+Within the active environment
+
+    python setup.py install
+
+or
+
+    pip install .
+
+or if you want to be able to edit & develop (requires reloading the package)
+
+    pip install -e .
+
+## _A trous_ transform
+
+ATrousTransform implements a dyadic 'à-trous' transform
 
 ## Scaling functions
 
 ### Triangle
 
 ### B3 spline
-
-## 'A trous' transform
-
-ATrousTransform implements a dyadic 'à-trous' transform
-
-## Utils
 
 ## Examples
 
@@ -58,16 +75,25 @@ The same result cam be obtained using the *denoise* convenience function
 This returns a 1-D ndarray containing the normalization
 used to estimate the significance of coefficients.
 
-## Installation
+## WOW! (Wavelets Optimized Whitening)
 
-From the active environment
+    from watroo import wow
+    # read in your image here (must be floating point)
+    # ...
 
-    python setup.py install
+Standard enhancement
 
-or
+    wow_image, _ = wow(image)
 
-    pip install .
+'bilateral' version, slower but better
 
-or if you want to be able to edit & develop (requires reloading the package)
+    wow_image, _ = wow(image, bilateral=1)
 
-    pip install -e .
+Denoised bilateral enhancement (best results)
+
+    wow_image, _ = wow(image, bilateral=1, denoise_coefficients=[5, 2])
+
+## References
+
+Starck, J.-L. & Murtagh, F. 2002, Handbook of Astronomical Data Analysis, Springer-Verlag
+Auchère, F., Soubrié, E., Pelouze, G., Buchlin, E. 2022, Image Enhancement With Wavelets Optimized Whitening, A&A, submitted 
