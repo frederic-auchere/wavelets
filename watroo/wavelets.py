@@ -267,6 +267,8 @@ class B3spline(AbstractScalingFunction):
     sigma_e_2d_bilateral = np.array([0.38234752, 0.24305799, 0.16012153, 0.10633541, 0.07083733,
                                      0.04728659, 0.03163678, 0.02122341, 0.01429102, 0.00952376])
 
+    sigma_e_3d_bilateral = np.array([0.44111772, 0.3552894,  0.16137159, 0.05769064, 0.01932497])
+
     def __init__(self, *args, **kwargs):
         super().__init__('b3spline',
                          *args, **kwargs)
