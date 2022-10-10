@@ -2,7 +2,7 @@ import copy
 import numpy as np
 import cv2
 import warnings
-from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe
+from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe, convolution
 
 __all__ = ['denoise', 'wow']
 
@@ -118,9 +118,6 @@ def wow(data,
         gamma_max=None,
         h=0):
 
-    # if len(denoise_coefficients) > 0:
-    #     data = generalized_anscombe(data)
-
     if type(data) is np.ndarray:  # input is an image
         if data.dtype is np.int32 or data.dtype is np.int64 or data.dtype == '>f4':
             data = np.float64(data)
@@ -186,7 +183,7 @@ def wow(data,
         else:
             if whitening:
                 atrous_kernel = coefficients.scaling_function.atrous_kernel(s)
-                cv2.filter2D(power, -1, atrous_kernel, dst=local_power, borderType=cv2.BORDER_REFLECT)
+                convolution(power, atrous_kernel, local_power)
                 local_power[local_power <= 0] = 1e-15
                 np.sqrt(local_power, out=local_power)
             else:
@@ -208,8 +205,5 @@ def wow(data,
         gamma_scaled /= gamma_max - gamma_min
         gamma_scaled **= gamma
         recon = (1 - h)*recon + h*gamma_scaled
-
-    # if len(denoise_coefficients) > 0 and not whitening:
-    #     recon = generalized_anscombe(recon, inverse=True)
 
     return recon, coefficients

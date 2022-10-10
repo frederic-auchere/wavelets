@@ -8,7 +8,7 @@ from tqdm import tqdm
 from numba import njit, prange
 
 
-__all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe']
+__all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
 
 
 def generalized_anscombe(signal, alpha=1, g=0, sigma=0, inverse=False):
@@ -36,6 +36,24 @@ def atrous_convolution(image, kernel, s):
     for dx, dy, k in zip(x.flatten(), y.flatten(), kernel.flatten()):
         output += k*padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
     return output
+
+
+def convolution(arr, kernel, output=None):
+    if output is None:
+        output = np.empty_like(arr)
+    if arr.ndim == 2:
+        cv2.filter2D(arr,
+                     -1,  # Same pixel depth as input
+                     kernel,
+                     output,
+                     (-1, -1),  # Anchor is kernel center
+                     0,  # Optional offset
+                     cv2.BORDER_REFLECT)
+    else:
+        convolve(arr,
+                 kernel,
+                 output=output,
+                 mode='mirror')
 
 
 def sdev_loc(image, kernel, s=0, variance=False):
@@ -467,19 +485,7 @@ class AtrousTransform:
 
             atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
             if self.bilateral is None:
-                if arr.ndim == 2:
-                    cv2.filter2D(coeffs[s],
-                                 -1,  # Same pixel depth as input
-                                 atrous_kernel,
-                                 coeffs[s + 1],  # Result goes in next scale
-                                 (-1, -1),  # Anchor is kernel center
-                                 0,  # Optional offset
-                                 cv2.BORDER_REFLECT)
-                else:
-                    convolve(coeffs[s],
-                             atrous_kernel,
-                             output=coeffs[s + 1],
-                             mode='mirror')
+                convolution(coeffs[s], atrous_kernel, coeffs[s+1])
             else:
                 variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
                 if self.bilateral_scaling:
