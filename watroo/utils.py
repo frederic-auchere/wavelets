@@ -122,16 +122,18 @@ def wow(data,
         if data.dtype is np.int32 or data.dtype is np.int64 or data.dtype == '>f4':
             data = np.float64(data)
         if n_scales is None:
-            n_scales = int(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d)))
+            # consider on ly the spatial dimensions
+            n_scales = int(np.log2(min(data.shape[0:2])) - np.log2(len(scaling_function.coefficients_1d)))
+        n_dims = data.ndim
     elif type(data) is Coefficients:  # input is already computed coefficients
-        coefficients = data
-        n_scales = len(coefficients)-1
+        n_scales = len(data)-1
+        n_dims = data[0].ndim
     else:
         raise ValueError('Unknown input type')
 
-    max_scales = len(scaling_function(2).sigma_e(bilateral=bilateral))
-    if n_scales > max_scales:
-        warnings.warn(f'Reqquired number of scales lager then the maximum for scaling function. Using {max_scales}.')
+    max_scales = len(scaling_function(n_dims).sigma_e(bilateral=bilateral))
+    if len(denoise_coefficients) > max_scales:
+        warnings.warn(f'Required number of scales lager then the maximum for scaling function. Using {max_scales}.')
         n_scales = max_scales
 
     if bilateral is None:
@@ -146,6 +148,10 @@ def wow(data,
         transform = AtrousTransform(scaling_function, bilateral=sigma_bilateral, bilateral_scaling=bilateral_scaling)
         coefficients = transform(data, n_scales)
         coefficients.noise = noise
+    elif type(data) is Coefficients:  # input is already computed coefficients
+        coefficients = data
+    else:
+        raise ValueError('Unknown input type')
 
     if h > 0:
         gamma_scaled = np.zeros_like(coefficients.data[0])
@@ -160,7 +166,7 @@ def wow(data,
     if n_denoise_coefficients < n_scales:
         scale_denoise_coefficients.extend([0, ]*(n_scales - n_denoise_coefficients))
     if len(scale_denoise_coefficients) == n_scales:
-            scale_denoise_coefficients.extend([1, ])
+        scale_denoise_coefficients.extend([1, ])
 
     pwr = []
     local_power = np.empty_like(coefficients.data[0])
