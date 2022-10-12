@@ -122,8 +122,8 @@ def wow(data,
         if data.dtype is np.int32 or data.dtype is np.int64 or data.dtype == '>f4':
             data = np.float64(data)
         if n_scales is None:
-            # consider on ly the spatial dimensions
-            n_scales = int(np.log2(min(data.shape[0:2])) - np.log2(len(scaling_function.coefficients_1d)))
+            n_scales = int(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d)))
+            print(n_scales)
         n_dims = data.ndim
     elif type(data) is Coefficients:  # input is already computed coefficients
         n_scales = len(data)-1
@@ -132,7 +132,7 @@ def wow(data,
         raise ValueError('Unknown input type')
 
     max_scales = len(scaling_function(n_dims).sigma_e(bilateral=bilateral))
-    if len(denoise_coefficients) > max_scales:
+    if len(denoise_coefficients) >= max_scales:
         warnings.warn(f'Required number of scales lager then the maximum for scaling function. Using {max_scales}.')
         n_scales = max_scales
 
