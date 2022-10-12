@@ -119,20 +119,19 @@ class Coefficients:
         return np.median(np.abs(self.data[0])) / 0.6745 / self.sigma_e[0]
 
     def significance(self, sigma, scale, soft_threshold=True):
-        if self.noise is None:
-            self.noise = self.get_noise()
-            if self.noise == 0:
-                return np.ones_like(self.data[0])
-        sigma_e = self.sigma_e[scale]
-        if soft_threshold:
-            if sigma != 0:
-                r = np.abs(self.data[scale] / (sigma * self.noise * sigma_e))
+        if sigma != 0:
+            if self.noise is None:
+                self.noise = self.get_noise()
+                if self.noise == 0:
+                    return np.ones_like(self.data[0])
+            if soft_threshold:
+                r = np.abs(self.data[scale] / (sigma * self.noise * self.sigma_e[scale]))
                 return special.erf(r)
                 # return r / (1 + r)
             else:
-                return 1
+                return np.abs(self.data[scale]) > (sigma * self.noise * self.sigma_e[scale])
         else:
-            return np.abs(self.data[scale]) > (sigma * self.noise * sigma_e)
+            return np.ones_like(self.data[0])
 
     def denoise(self, sigma, weights=None, soft_threshold=True):
         if weights is None:
