@@ -122,7 +122,6 @@ def wow(data,
             data = np.float64(data)
         if n_scales is None:
             n_scales = int(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d)))
-            print(n_scales)
         n_dims = data.ndim
     elif type(data) is Coefficients:  # input is already computed coefficients
         n_scales = len(data)-1
