@@ -207,7 +207,7 @@ def wow(data,
             gamma_max = data.max()
         gamma_scaled -= gamma_min
         gamma_scaled /= gamma_max - gamma_min
-        gamma_scaled **= gamma
+        gamma_scaled **= 1/gamma
         recon = (1 - h)*recon + h*gamma_scaled
 
     return recon, coefficients
