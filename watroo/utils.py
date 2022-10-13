@@ -1,8 +1,7 @@
 import copy
 import numpy as np
-import cv2
 import warnings
-from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe, convolution
+from wavelets import AtrousTransform, B3spline, Coefficients, generalized_anscombe, convolution
 
 __all__ = ['denoise', 'wow']
 
