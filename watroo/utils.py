@@ -120,12 +120,16 @@ def wow(data,
     if type(data) is np.ndarray:  # input is an image
         if data.dtype is np.int32 or data.dtype is np.int64 or data.dtype == '>f4':
             data = np.float64(data)
+        max_scales = int(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d)))
         if n_scales is None:
-            n_scales = int(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d)))
+            n_scales = max_scales
+        elif n_scales > max_scales:
+            n_scales = max_scales
         n_dims = data.ndim
     elif type(data) is Coefficients:  # input is already computed coefficients
         n_scales = len(data)-1
         n_dims = data[0].ndim
+        scaling_function = data.scaling_function
     else:
         raise ValueError('Unknown input type')
 
