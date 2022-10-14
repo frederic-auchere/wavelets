@@ -206,9 +206,9 @@ def wow(data,
 
     if h > 0:
         if gamma_min is None:
-            gamma_min = data.min()
+            gamma_min = gamma_scaled.min()
         if gamma_max is None:
-            gamma_max = data.max()
+            gamma_max = gamma_scaled.max()
         gamma_scaled -= gamma_min
         gamma_scaled /= gamma_max - gamma_min
         gamma_scaled **= 1/gamma
