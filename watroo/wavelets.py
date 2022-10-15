@@ -95,6 +95,17 @@ def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
         output += shifted*diff
     output /= norm
     return output
+    # def range_weighting(image, padded, slc, k):
+    #     shifted = padded[slc]
+    #     return ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)')
+    # parameters = []
+    # for *deltas, k in zip(*indices, kernel[mask]):
+    #     slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
+    #     parameters.append((image, padded, slc, k))
+    # diff = pool.starmap(range_weighting, parameters)
+    # for *deltas, k, d in zip(*indices, kernel[mask], diff):
+    #     norm += d
+    #     output += padded[slc]*d
 
 
 class Coefficients:
