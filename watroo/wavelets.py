@@ -5,6 +5,7 @@ from scipy import special
 from scipy.ndimage import convolve
 import numexpr as ne
 from tqdm import tqdm
+from multiprocessing import Pool
 
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
@@ -72,6 +73,11 @@ def sdev_loc(image, kernel, s=0, variance=False):
         return np.sqrt(vari)
 
 
+def range_weighting(image, padded, variance, slc, k):
+    shifted = padded[slc]
+    return ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)')
+
+
 def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
 
     half_widths = tuple([s//2 for s in kernel.shape])  # z, y, x order
@@ -87,25 +93,18 @@ def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
     mask[half_widths] = False
     indices = [(shape - 1 - index[mask])*2**s for index, shape in zip(indices, kernel.shape)]
 
+    parameters = []
     for *deltas, k in zip(*indices, kernel[mask]):
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
-        shifted[:] = padded[slc]
-        ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)', out=diff)
-        norm += diff
-        output += shifted*diff
+        parameters.append((image, padded, variance, slc, k))
+    with Pool() as pool:
+        diff = pool.starmap(range_weighting, parameters)
+    for *deltas, k, d in zip(*indices, kernel[mask], diff):
+        norm += d
+        output += padded[slc]*d
+
     output /= norm
     return output
-    # def range_weighting(image, padded, slc, k):
-    #     shifted = padded[slc]
-    #     return ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)')
-    # parameters = []
-    # for *deltas, k in zip(*indices, kernel[mask]):
-    #     slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
-    #     parameters.append((image, padded, slc, k))
-    # diff = pool.starmap(range_weighting, parameters)
-    # for *deltas, k, d in zip(*indices, kernel[mask], diff):
-    #     norm += d
-    #     output += padded[slc]*d
 
 
 class Coefficients:
