@@ -20,24 +20,7 @@ def generalized_anscombe(signal, alpha=1, g=0, sigma=0, inverse=False):
         return 2*np.sqrt(dum)/alpha
 
 
-def atrous_convolution(image, kernel, s):
-
-    hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
-    padded = np.pad(image, (hwy*2**s, hwx*2**s), mode='reflect')
-    output = np.zeros_like(image)
-    norm = np.full_like(image, kernel[hwy, hwx])
-    shifted = np.empty_like(image)
-
-    y, x = np.indices(kernel.shape)
-    x = (kernel.shape[1] - 1 - x)*2**s
-    y = (kernel.shape[0] - 1 - y)*2**s
-
-    for dx, dy, k in zip(x.flatten(), y.flatten(), kernel.flatten()):
-        output += k*padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
-    return output
-
-
-def convolution(arr, kernel, output=None):
+def convolution(arr, kernel, s=0, output=None):
     if output is None:
         output = np.empty_like(arr)
     if arr.ndim == 2:
@@ -72,28 +55,33 @@ def sdev_loc(image, kernel, s=0, variance=False):
         return np.sqrt(vari)
 
 
-def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
+def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="reflect", output=None):
 
     half_widths = tuple([s//2 for s in kernel.shape])  # z, y, x order
     padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
-    output = kernel[half_widths]*image
-    norm = np.full_like(image, kernel[half_widths])
+    if output is None:
+        output = np.empty_like(image)
+    output[:] = kernel[half_widths] * image
 
-    shifted = np.empty_like(image)
-    diff = np.empty_like(image)
+    if bilateral_variance:
+        norm = np.full_like(image, kernel[half_widths])
 
-    indices = np.indices(kernel.shape)  # z, y, x order
     mask = np.ones(kernel.shape, dtype=bool)
     mask[half_widths] = False
+    indices = np.indices(kernel.shape)
     indices = [(shape - 1 - index[mask])*2**s for index, shape in zip(indices, kernel.shape)]
 
     for *deltas, k in zip(*indices, kernel[mask]):
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
-        shifted[:] = padded[slc]
-        ne.evaluate('k*exp(-((image - shifted)**2)/variance/2)', out=diff)
-        norm += diff
-        output += shifted*diff
-    output /= norm
+        if bilateral_variance:
+            weight = ne.evaluate('exp(-((image - padded[slc])**2)/bilateral_variance/2)')
+            padded[slc] *= weight
+            norm += weight
+        output += padded[slc]*k
+
+    if bilateral_variance:
+        output /= norm
+
     return output
 
 
@@ -445,13 +433,13 @@ class AtrousTransform:
 
             atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
             if self.bilateral is None:
-                convolution(coeffs[s], atrous_kernel, coeffs[s+1])
+                convolution(coeffs[s], atrous_kernel, s=s, output=coeffs[s+1])
             else:
                 variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
                 if self.bilateral_scaling:
                     variance *= s+1
                 kernel = scaling_function.kernel.astype(arr.dtype)
-                coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
+                coeffs[s+1] = atrous_convolution(coeffs[s], kernel, variance, s=s, mode='symmetric')
 
             coeffs[s] -= coeffs[s + 1]
 
