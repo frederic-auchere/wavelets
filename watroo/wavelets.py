@@ -24,8 +24,6 @@ def atrous_convolution(image, kernel, s):
     hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
     padded = np.pad(image, (hwy * 2**s, hwx * 2**s), mode='reflect')
     output = np.zeros_like(image)
-    norm = np.full_like(image, kernel[hwy, hwx])
-    shifted = np.empty_like(image)
 
     y, x = np.indices(kernel.shape)
     x = (kernel.shape[1] - 1 - x) * 2**s
