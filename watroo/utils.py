@@ -1,8 +1,7 @@
 import copy
 import numpy as np
-import cv2
 import warnings
-from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe
+from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe, convolution
 
 __all__ = ['denoise', 'wow']
 
@@ -63,9 +62,9 @@ def enhance(*args, weights=None, denoise=None, soft_threshold=True, out=None, **
         wgt = weights if c is Ellipsis else weights[c]
 
         if len(wgt) < len(dns):
-            wgt.extend([1] * (len(dns) - len(wgt)))
+            wgt.extend([1]*(len(dns) - len(wgt)))
         elif len(dns) < len(wgt):
-            dns.extend([0] * (len(wgt) - len(dns)))
+            dns.extend([0]*(len(wgt) - len(dns)))
 
         coeffs = atrous(img[c], len(wgt))
         if len(args) == 2:
@@ -121,23 +120,28 @@ def wow(data,
     if type(data) is np.ndarray:  # input is an image
         if data.dtype is np.int32 or data.dtype is np.int64 or data.dtype == '>f4':
             data = np.float64(data)
+        max_scales = int(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d)))
         if n_scales is None:
-            n_scales = int(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d)))
+            n_scales = max_scales
+        elif n_scales > max_scales:
+            n_scales = max_scales
+        n_dims = data.ndim
     elif type(data) is Coefficients:  # input is already computed coefficients
-        coefficients = data
-        n_scales = len(coefficients)-1
+        n_scales = len(data)-1
+        n_dims = data[0].ndim
+        scaling_function = data.scaling_function
     else:
         raise ValueError('Unknown input type')
 
-    max_scales = len(scaling_function(2).sigma_e(bilateral=bilateral))
-    if n_scales > max_scales:
-        warnings.warn(f'Required number of scales larger than the maximum for scaling function. Using {max_scales}.')
+    max_scales = len(scaling_function(n_dims).sigma_e(bilateral=bilateral))
+    if len(denoise_coefficients) >= max_scales:
+        warnings.warn(f'Required number of scales lager then the maximum for scaling function. Using {max_scales}.')
         n_scales = max_scales
 
     if bilateral is None:
         sigma_bilateral = None
     else:
-        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral, ] * (n_scales+1)
+        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral, ]*(n_scales+1)
         n_bilateral = len(sigma_bilateral)
         if n_bilateral <= n_scales:
             sigma_bilateral.extend([1, ] * (n_scales - n_bilateral + 1))
@@ -146,6 +150,10 @@ def wow(data,
         transform = AtrousTransform(scaling_function, bilateral=sigma_bilateral, bilateral_scaling=bilateral_scaling)
         coefficients = transform(data, n_scales)
         coefficients.noise = noise
+    elif type(data) is Coefficients:  # input is already computed coefficients
+        coefficients = data
+    else:
+        raise ValueError('Unknown input type')
 
     if h > 0:
         gamma_scaled = np.zeros_like(coefficients.data[0])
@@ -153,12 +161,12 @@ def wow(data,
     recomposition_weights = copy.copy(weights)
     n_weights = len(recomposition_weights)
     if n_weights <= n_scales:
-        recomposition_weights.extend([1, ] * (n_scales - n_weights + 1))
+        recomposition_weights.extend([1, ]*(n_scales - n_weights + 1))
 
     scale_denoise_coefficients = copy.copy(denoise_coefficients)
     n_denoise_coefficients = len(scale_denoise_coefficients)
     if n_denoise_coefficients < n_scales:
-        scale_denoise_coefficients.extend([0, ] * (n_scales - n_denoise_coefficients))
+        scale_denoise_coefficients.extend([0, ]*(n_scales - n_denoise_coefficients))
     if len(scale_denoise_coefficients) == n_scales:
         scale_denoise_coefficients.extend([1, ])
 
@@ -183,7 +191,7 @@ def wow(data,
         else:
             if whitening:
                 atrous_kernel = coefficients.scaling_function.atrous_kernel(s)
-                cv2.filter2D(power, -1, atrous_kernel, dst=local_power, borderType=cv2.BORDER_REFLECT)
+                convolution(power, atrous_kernel, output=local_power)
                 local_power[local_power <= 0] = 1e-15
                 np.sqrt(local_power, out=local_power)
             else:
@@ -192,18 +200,19 @@ def wow(data,
         if h > 0:
             gamma_scaled += c
         pwr.append(local_power)
-        c *= w * power_norm / pwr[s]
+        c *= w*power_norm/pwr[s]
 
     recon = np.sum(coefficients, axis=0)
 
     if h > 0:
         if gamma_min is None:
-            gamma_min = data.min()
+            gamma_min = gamma_scaled.min()
         if gamma_max is None:
-            gamma_max = data.max()
+            gamma_max = gamma_scaled.max()
         gamma_scaled -= gamma_min
         gamma_scaled /= gamma_max - gamma_min
-        gamma_scaled **= gamma
-        recon = (1 - h)*recon + h * gamma_scaled
+        gamma_scaled[gamma_scaled < 0] = 0
+        gamma_scaled **= 1/gamma
+        recon = (1 - h)*recon + h*gamma_scaled
 
     return recon, coefficients

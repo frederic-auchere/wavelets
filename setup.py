@@ -20,7 +20,8 @@ REQUIRED = [
     'scipy',
     'numpy',
     'numexpr',
-    'opencv-python'
+    'opencv-python',
+    'tqdm'
 ]
 
 # If you do change the License, remember to change the Trove Classifier for that!
