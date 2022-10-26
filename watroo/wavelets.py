@@ -12,27 +12,25 @@ __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generaliz
 def generalized_anscombe(signal, alpha=1, g=0, sigma=0, inverse=False):
 
     if inverse:
-        return ((alpha*signal/2)**2 + alpha*g - sigma**2 - 3*alpha/8)/alpha
+        return ((alpha * signal / 2)**2 + alpha * g - sigma**2 - 3 * alpha / 8) / alpha
     else:
-        dum = alpha*signal + 3*alpha**2/8 + sigma**2 - alpha*g
+        dum = alpha * signal + 3 * alpha**2 / 8 + sigma**2 - alpha * g
         dum[dum <= 0] = 0
-        return 2*np.sqrt(dum)/alpha
+        return 2 * np.sqrt(dum) / alpha
 
 
 def atrous_convolution(image, kernel, s):
 
-    hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
-    padded = np.pad(image, (hwy*2**s, hwx*2**s), mode='reflect')
+    hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
+    padded = np.pad(image, (hwy * 2**s, hwx * 2**s), mode='reflect')
     output = np.zeros_like(image)
-    norm = np.full_like(image, kernel[hwy, hwx])
-    shifted = np.empty_like(image)
 
     y, x = np.indices(kernel.shape)
-    x = (kernel.shape[1] - 1 - x)*2**s
-    y = (kernel.shape[0] - 1 - y)*2**s
+    x = (kernel.shape[1] - 1 - x) * 2**s
+    y = (kernel.shape[0] - 1 - y) * 2**s
 
     for dx, dy, k in zip(x.flatten(), y.flatten(), kernel.flatten()):
-        output += k*padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
+        output += k * padded[dy:dy+image.shape[0], dx:dx+image.shape[1]]
     return output
 
 
@@ -53,16 +51,16 @@ def sdev_loc(image, kernel, s=0, variance=False):
 
 def bilateral_filter(image, kernel, variance, s=0, mode="reflect"):
 
-    hwx, hwy = kernel.shape[1]//2, kernel.shape[0]//2
-    padded = np.pad(image, (hwy*2**s, hwx*2**s), mode=mode)
-    output = kernel[hwy, hwx]*image
+    hwx, hwy = kernel.shape[1] // 2, kernel.shape[0] // 2
+    padded = np.pad(image, (hwy * 2**s, hwx * 2**s), mode=mode)
+    output = kernel[hwy, hwx] * image
     norm = np.full_like(image, kernel[hwy, hwx])
     shifted = np.empty_like(image)
     diff = np.empty_like(image)
 
     y, x = np.indices(kernel.shape)
-    x = (kernel.shape[1] - 1 - x)*2**s
-    y = (kernel.shape[0] - 1 - y)*2**s
+    x = (kernel.shape[1] - 1 - x) * 2**s
+    y = (kernel.shape[0] - 1 - y) * 2**s
     mask = np.ones(kernel.shape, dtype=bool)
     mask[hwy, hwx] = False
 
@@ -114,9 +112,9 @@ class Coefficients:
 
     def denoise(self, sigma, weights=None, soft_threshold=True):
         if weights is None:
-            weights = (1,)*len(sigma)
+            weights = (1,) * len(sigma)
         for scl, (c, sig, wgt) in enumerate(zip(self.data, sigma, weights)):
-            c *= wgt*self.significance(sig, scl, soft_threshold=soft_threshold)
+            c *= wgt * self.significance(sig, scl, soft_threshold=soft_threshold)
 
 
 class AbstractScalingFunction:
@@ -160,8 +158,8 @@ class AbstractScalingFunction:
 
     def atrous_kernel(self, scale):
 
-        kernel = np.zeros([(shp-1)*2**scale + 1 for shp in self.kernel.shape])
-        strides = (slice(None, None, 2**scale),)*self.n_dim
+        kernel = np.zeros([(shp-1) * 2**scale + 1 for shp in self.kernel.shape])
+        strides = (slice(None, None, 2**scale),) * self.n_dim
         kernel[strides] = self.kernel
 
         return kernel
@@ -192,7 +190,7 @@ class AbstractScalingFunction:
         transform = AtrousTransform(self.__class__, bilateral=bilateral)
         std = np.zeros(n_scales)
         for i in tqdm(range(n_trials)):
-            data = np.random.normal(size=(2**n_scales,)*self.n_dim).astype(np.float32)
+            data = np.random.normal(size=(2**n_scales,) * self.n_dim).astype(np.float32)
             coefficients = transform(data, n_scales)
             std += coefficients.data[:-1].std(axis=tuple(range(1, self.n_dim+1)))
         std /= n_trials
@@ -314,7 +312,7 @@ class AtrousTransform:
         C2  -4  -3  -2  -1   0   1   2   3   4
         """
 
-        sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ]*(level+1)
+        sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ] * (level+1)
         n_bilateral = len(sigma_bilateral)
         if n_bilateral <= level:
             sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
@@ -348,7 +346,7 @@ class AtrousTransform:
                              output=conv,
                              mode='mirror')
             else:
-                variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
+                variance = sdev_loc(conv, kernel, variance=True) * sigma_bilateral[s]**2
                 conv[:] = bilateral_filter(conv, kernel, variance, mode='symmetric')
 
             if conv.ndim == 2:
@@ -379,7 +377,7 @@ class AtrousTransform:
 
         kernel = scaling_function.kernel.astype(arr.dtype)
 
-        hwy, hwx = (kernel.shape[0]//2)*2**(level-1), (kernel.shape[1]//2)*2**(level-1)
+        hwy, hwx = (kernel.shape[0] // 2) * 2**(level - 1), (kernel.shape[1] // 2) * 2**(level - 1)
         arr = np.pad(arr, (hwy, hwx), mode='reflect')
 
         coeffs = np.empty((level+1,) + arr.shape, dtype=arr.dtype)
@@ -431,9 +429,9 @@ class AtrousTransform:
                              output=coeffs[s + 1],
                              mode='mirror')
             else:
-                variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
+                variance = sdev_loc(coeffs[s], atrous_kernel, variance=True) * sigma_bilateral[s]**2
                 if self.bilateral_scaling:
-                    variance *= s+1
+                    variance *= s + 1
                 kernel = scaling_function.kernel.astype(arr.dtype)
                 coeffs[s+1] = bilateral_filter(coeffs[s], kernel, variance, s=s, mode='symmetric')
 

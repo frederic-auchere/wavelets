@@ -63,9 +63,9 @@ def enhance(*args, weights=None, denoise=None, soft_threshold=True, out=None, **
         wgt = weights if c is Ellipsis else weights[c]
 
         if len(wgt) < len(dns):
-            wgt.extend([1]*(len(dns) - len(wgt)))
+            wgt.extend([1] * (len(dns) - len(wgt)))
         elif len(dns) < len(wgt):
-            dns.extend([0]*(len(wgt) - len(dns)))
+            dns.extend([0] * (len(wgt) - len(dns)))
 
         coeffs = atrous(img[c], len(wgt))
         if len(args) == 2:
@@ -131,13 +131,13 @@ def wow(data,
 
     max_scales = len(scaling_function(2).sigma_e(bilateral=bilateral))
     if n_scales > max_scales:
-        warnings.warn(f'Reqquired number of scales lager then the maximum for scaling function. Using {max_scales}.')
+        warnings.warn(f'Required number of scales larger than the maximum for scaling function. Using {max_scales}.')
         n_scales = max_scales
 
     if bilateral is None:
         sigma_bilateral = None
     else:
-        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral, ]*(n_scales+1)
+        sigma_bilateral = copy.copy(bilateral) if type(bilateral) is list else [bilateral, ] * (n_scales+1)
         n_bilateral = len(sigma_bilateral)
         if n_bilateral <= n_scales:
             sigma_bilateral.extend([1, ] * (n_scales - n_bilateral + 1))
@@ -153,14 +153,14 @@ def wow(data,
     recomposition_weights = copy.copy(weights)
     n_weights = len(recomposition_weights)
     if n_weights <= n_scales:
-        recomposition_weights.extend([1, ]*(n_scales - n_weights + 1))
+        recomposition_weights.extend([1, ] * (n_scales - n_weights + 1))
 
     scale_denoise_coefficients = copy.copy(denoise_coefficients)
     n_denoise_coefficients = len(scale_denoise_coefficients)
     if n_denoise_coefficients < n_scales:
-        scale_denoise_coefficients.extend([0, ]*(n_scales - n_denoise_coefficients))
+        scale_denoise_coefficients.extend([0, ] * (n_scales - n_denoise_coefficients))
     if len(scale_denoise_coefficients) == n_scales:
-            scale_denoise_coefficients.extend([1, ])
+        scale_denoise_coefficients.extend([1, ])
 
     pwr = []
     local_power = np.empty_like(coefficients.data[0])
@@ -192,7 +192,7 @@ def wow(data,
         if h > 0:
             gamma_scaled += c
         pwr.append(local_power)
-        c *= w*power_norm/pwr[s]
+        c *= w * power_norm / pwr[s]
 
     recon = np.sum(coefficients, axis=0)
 
@@ -204,6 +204,6 @@ def wow(data,
         gamma_scaled -= gamma_min
         gamma_scaled /= gamma_max - gamma_min
         gamma_scaled **= gamma
-        recon = (1 - h)*recon + h*gamma_scaled
+        recon = (1 - h)*recon + h * gamma_scaled
 
     return recon, coefficients
