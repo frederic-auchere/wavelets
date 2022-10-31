@@ -186,8 +186,8 @@ def wow(data,
         if s == n_scales:
             if whitening:
                 local_power = np.std(c)
-                if local_power == 0:
-                    local_power == 1e-15
+                if local_power <= 0:
+                    local_power = 1e-15
             else:
                 local_power = 1
         else:
