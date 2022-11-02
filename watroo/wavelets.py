@@ -357,7 +357,7 @@ class AtrousTransform:
                 convolution(conv, kernel, output=conv)
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
-                conv[:] = atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric')
+                atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv)
 
             if conv.ndim == 2:
                 coeffs[s+1, dy::2**s, dx::2**s] = conv
