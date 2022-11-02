@@ -400,8 +400,8 @@ class AtrousTransform:
 
         kernel = scaling_function.kernel.astype(arr.dtype)
 
-        half_widths = tuple([(s // 2)* 2 ** (level-1) for s in kernel.shape])
-        arr = np.pad(arr, half_widths, mode='reflect')
+        half_widths = tuple([(s // 2) * 2 ** (level-1) for s in kernel.shape])
+        arr = np.pad(arr, [(hw,) * 2 for hw in half_widths], mode='reflect')
 
         coeffs = np.empty((level+1,) + arr.shape, dtype=arr.dtype)
         coeffs[0] = arr
