@@ -380,22 +380,21 @@ class AtrousTransform:
                 return
 
             # For given subscale, extracts one pixel out of two on each axis.
-            # By default .copy() returns c-ordered arrays (as opposed to np.copy())
             if conv.ndim == 2:
-                recursive_convolution(conv[0::2, 0::2].copy(), s=s+1, dx=dx, dy=dy)
-                recursive_convolution(conv[1::2, 0::2].copy(), s=s+1, dx=dx, dy=dy+2**s)
-                recursive_convolution(conv[0::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy)
-                recursive_convolution(conv[1::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy+2**s)
+                recursive_convolution(conv[0::2, 0::2], s=s+1, dx=dx, dy=dy)
+                recursive_convolution(conv[1::2, 0::2], s=s+1, dx=dx, dy=dy+2**s)
+                recursive_convolution(conv[0::2, 1::2], s=s+1, dx=dx+2**s, dy=dy)
+                recursive_convolution(conv[1::2, 1::2], s=s+1, dx=dx+2**s, dy=dy+2**s)
             else:
-                recursive_convolution(conv[0::2, 0::2, 0::2].copy(), s=s+1, dx=dx, dy=dy, dz=dz)
-                recursive_convolution(conv[0::2, 1::2, 0::2].copy(), s=s+1, dx=dx, dy=dy+2**s, dz=dz)
-                recursive_convolution(conv[0::2, 0::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy, dz=dz)
-                recursive_convolution(conv[0::2, 1::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy+2**s, dz=dz)
+                recursive_convolution(conv[0::2, 0::2, 0::2], s=s+1, dx=dx, dy=dy, dz=dz)
+                recursive_convolution(conv[0::2, 1::2, 0::2], s=s+1, dx=dx, dy=dy+2**s, dz=dz)
+                recursive_convolution(conv[0::2, 0::2, 1::2], s=s+1, dx=dx+2**s, dy=dy, dz=dz)
+                recursive_convolution(conv[0::2, 1::2, 1::2], s=s+1, dx=dx+2**s, dy=dy+2**s, dz=dz)
 
-                recursive_convolution(conv[1::2, 0::2, 0::2].copy(), s=s+1, dx=dx, dy=dy, dz=dz+2**s)
-                recursive_convolution(conv[1::2, 1::2, 0::2].copy(), s=s+1, dx=dx, dy=dy+2**s, dz=dz+2**s)
-                recursive_convolution(conv[1::2, 0::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy, dz=dz+2**s)
-                recursive_convolution(conv[1::2, 1::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy+2**s, dz=dz+2**s)
+                recursive_convolution(conv[1::2, 0::2, 0::2], s=s+1, dx=dx, dy=dy, dz=dz+2**s)
+                recursive_convolution(conv[1::2, 1::2, 0::2], s=s+1, dx=dx, dy=dy+2**s, dz=dz+2**s)
+                recursive_convolution(conv[1::2, 0::2, 1::2], s=s+1, dx=dx+2**s, dy=dy, dz=dz+2**s)
+                recursive_convolution(conv[1::2, 1::2, 1::2], s=s+1, dx=dx+2**s, dy=dy+2**s, dz=dz+2**s)
 
         kernel = scaling_function.kernel.astype(arr.dtype)
 
