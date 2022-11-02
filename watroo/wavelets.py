@@ -411,7 +411,7 @@ class AtrousTransform:
         for s in range(level):  # Computes coefficients from convolved arrays
             coeffs[s] -= coeffs[s+1]
 
-        slc = tuple([slice(0, level), [slice(hw, -hw) for hw in half_widths]])
+        slc = tuple([slice(0, level), *[slice(hw, -hw) for hw in half_widths]])
         return np.copy(coeffs[slc])
 
     def atrous_standard(self, arr, level, scaling_function):
