@@ -35,7 +35,7 @@ def sdev_loc(image, kernel, s=0, variance=False):
         return np.sqrt(vari)
 
 
-def convolution(arr, kernel, s=0, output=None):
+def convolution(arr, kernel, output=None):
     if output is None:
         output = np.empty_like(arr)
     if arr.ndim == 2:
@@ -354,19 +354,7 @@ class AtrousTransform:
             dx=0, dy=0: current offsets of the sub-array
             """
             if self.bilateral is None:
-                if conv.ndim == 2:
-                    cv2.filter2D(conv,
-                                 -1,        # Same pixel depth as input
-                                 kernel,    # Kernel known from outer context
-                                 conv,      # In place operation
-                                 (-1, -1),  # Anchor is at kernel center
-                                 0,         # Optional offset
-                                 cv2.BORDER_REFLECT)
-                else:
-                    convolve(conv,
-                             kernel,
-                             output=conv,
-                             mode='mirror')
+                convolution(conv, kernel, output=conv)
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
                 conv[:] = atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric')
