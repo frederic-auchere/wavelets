@@ -55,13 +55,10 @@ def convolution(arr, kernel, output=None):
     return output
 
 
-def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="reflect", output=None, pad=True):
+def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="reflect", output=None):
 
     half_widths = tuple([s//2 for s in kernel.shape])
-    if pad:
-        padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
-    else:
-        padded = image
+    padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
     if output is None:
         output = np.empty_like(image)
     output[:] = kernel[half_widths] * image
@@ -360,7 +357,7 @@ class AtrousTransform:
                 convolution(conv, kernel, output=conv)
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
-                atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv, pad=False)
+                atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv)
 
             if conv.ndim == 2:
                 coeffs[s+1, dy::2**s, dx::2**s] = conv
