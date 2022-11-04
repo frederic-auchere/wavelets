@@ -363,7 +363,7 @@ class AtrousTransform:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
                 atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv)
 
-            coeffs[tuple(slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets])] = conv
+            coeffs[tuple([slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]])] = conv
 
             if s == level-1:
                 return
@@ -386,7 +386,7 @@ class AtrousTransform:
         for s in range(level):  # Computes coefficients from convolved arrays
             coeffs[s] -= coeffs[s+1]
 
-        return np.copy(coeffs[tuple(slice(0, level + 1), *[slice(hw, -hw) for hw in half_widths])])  # remove pads
+        return np.copy(coeffs[tuple([slice(0, level + 1), *[slice(hw, -hw) for hw in half_widths]])])  # remove pads
 
     def atrous_standard(self, arr, level, scaling_function):
         """
