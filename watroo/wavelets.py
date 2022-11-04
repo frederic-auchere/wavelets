@@ -370,9 +370,7 @@ class AtrousTransform:
                 return
 
             # For given subscale, extracts one pixel out of two on each axis.
-            slc = []
-            for p in product(*((0, 1),)*conv.ndim):
-                slc.append(tuple([slice(o, None, 2) for o in p]))
+            slc = [tuple([slice(o, None, 2) for o in p]) for p in product(*((0, 1),)*conv.ndim)]
 
             # copy array if 2 dimensions for open-cv requires c-contiguous array
             for sl in slc:
