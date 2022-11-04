@@ -5,6 +5,7 @@ from scipy import special
 from scipy.ndimage import convolve
 import numexpr as ne
 from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
 
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
@@ -339,7 +340,7 @@ class AtrousTransform:
         if n_bilateral <= level:
             sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
 
-        def recursive_convolution(conv, s=0, dx=0, dy=0, dz=0):
+        def recursive_convolution(conv, s=0, offsets=None):
             """
             Recursively computes the 'à trous' convolution of the input array by
             extracting 'à trous' sub-arrays instead of using an 'à trous' kernel.
@@ -353,42 +354,37 @@ class AtrousTransform:
             s=0: current scale at which the convolution is performed
             dx=0, dy=0: current offsets of the sub-array
             """
+            if offsets is None:
+                offsets = (0, )*conv.ndim
+
             if self.bilateral is None:
                 convolution(conv, kernel, output=conv)
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
                 atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv)
 
-            if conv.ndim == 2:
-                coeffs[s+1, dy::2**s, dx::2**s] = conv
-            else:
-                coeffs[s+1, dz::2**s, dy::2**s, dx::2**s] = conv
+            coeffs[slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]] = conv
 
             if s == level-1:
                 return
 
             # For given subscale, extracts one pixel out of two on each axis.
-            if conv.ndim == 2:
-                # By default .copy() returns c-ordered arrays (as opposed to np.copy())
-                recursive_convolution(conv[0::2, 0::2].copy(), s=s+1, dx=dx, dy=dy)
-                recursive_convolution(conv[1::2, 0::2].copy(), s=s+1, dx=dx, dy=dy+2**s)
-                recursive_convolution(conv[0::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy)
-                recursive_convolution(conv[1::2, 1::2].copy(), s=s+1, dx=dx+2**s, dy=dy+2**s)
-            else:
-                # Non need to copy since 3D convolution is not done using open-cv
-                recursive_convolution(conv[0::2, 0::2, 0::2], s=s+1, dx=dx, dy=dy, dz=dz)
-                recursive_convolution(conv[0::2, 1::2, 0::2], s=s+1, dx=dx, dy=dy+2**s, dz=dz)
-                recursive_convolution(conv[0::2, 0::2, 1::2], s=s+1, dx=dx+2**s, dy=dy, dz=dz)
-                recursive_convolution(conv[0::2, 1::2, 1::2], s=s+1, dx=dx+2**s, dy=dy+2**s, dz=dz)
+            slc = [[slice(0, None, 2)], [slice(1, None, 2)]]
+            for d in range(1, conv.ndim):
+                n_slc = []
+                for sl in slc:
+                    n_slc.append([slice(0, None, 2), *sl])
+                    n_slc.append([slice(1, None, 2), *sl])
+                slc = n_slc
 
-                recursive_convolution(conv[1::2, 0::2, 0::2], s=s+1, dx=dx, dy=dy, dz=dz+2**s)
-                recursive_convolution(conv[1::2, 1::2, 0::2], s=s+1, dx=dx, dy=dy+2**s, dz=dz+2**s)
-                recursive_convolution(conv[1::2, 0::2, 1::2], s=s+1, dx=dx+2**s, dy=dy, dz=dz+2**s)
-                recursive_convolution(conv[1::2, 1::2, 1::2], s=s+1, dx=dx+2**s, dy=dy+2**s, dz=dz+2**s)
+            # copy array if 2 dimensions for open-cv requires c-contiguous array
+            c = conv[tuple(sl)].copy() if conv.ndim == 2 else conv[tuple(sl)]
+            for sl in slc:
+                recursive_convolution(c, s=s + 1, offsets=[o + d.start * 2**s for o, d in zip(offsets, sl)])
 
         kernel = scaling_function.kernel.astype(arr.dtype)
 
-        half_widths = tuple([(s // 2) * 2 ** (level-1) for s in kernel.shape])
+        half_widths = tuple([(s // 2) * 2**(level-1) for s in kernel.shape])
         arr = np.pad(arr, [(hw,) * 2 for hw in half_widths], mode='reflect')
 
         coeffs = np.empty((level+1,) + arr.shape, dtype=arr.dtype)
@@ -399,8 +395,7 @@ class AtrousTransform:
         for s in range(level):  # Computes coefficients from convolved arrays
             coeffs[s] -= coeffs[s+1]
 
-        slc = tuple([slice(0, level+1), *[slice(hw, -hw) for hw in half_widths]])  # remove pads
-        return np.copy(coeffs[slc])
+        return np.copy(coeffs[slice(0, level+1), *[slice(hw, -hw) for hw in half_widths]])  # remove pads
 
     def atrous_standard(self, arr, level, scaling_function):
         """
