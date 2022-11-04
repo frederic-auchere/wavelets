@@ -299,22 +299,12 @@ class AtrousTransform:
             raise ValueError("Unsupported number of dimensions")
 
         scaling_function = self.scaling_function_class(arr.ndim)
-        if recursive:
-            return Coefficients(
-                                self.atrous_recursive(arr,
-                                                      level,
-                                                      scaling_function),
-                                scaling_function,
-                                self.bilateral
-            )
-        else:
-            return Coefficients(
-                                self.atrous_standard(arr,
-                                                     level,
-                                                     scaling_function),
-                                scaling_function,
-                                self.bilateral
-            )
+        method = self.atrous_recursive if recursive else self.atrous_standard
+        return Coefficients(
+                            method(arr, level, scaling_function),
+                            scaling_function,
+                            self.bilateral
+        )
 
     def atrous_recursive(self, arr, level, scaling_function):
         """
