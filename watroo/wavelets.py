@@ -5,7 +5,6 @@ from scipy import special
 from scipy.ndimage import convolve
 import numexpr as ne
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
 
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
