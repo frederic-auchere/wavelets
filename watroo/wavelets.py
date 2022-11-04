@@ -370,7 +370,7 @@ class AtrousTransform:
                 return
 
             # For given subscale, extracts one pixel out of two on each axis.
-            for sl in [tuple([slice(o, None, 2) for o in p]) for p in product(*((0, 1),)*conv.ndim)]:
+            for sl in product(*((slice(0, None, 2), slice(1, None, 2)), )*conv.ndim):
                 c = conv[sl].copy() if conv.ndim == 2 else conv[sl]  # copy if 2-D for open-cv requires c-contiguous
                 recursive_convolution(c, s=s + 1, offsets=[o + d.start * 2**s for o, d in zip(offsets, sl)])
 
