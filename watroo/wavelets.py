@@ -5,6 +5,7 @@ from scipy import special
 from scipy.ndimage import convolve
 import numexpr as ne
 from tqdm import tqdm
+from itertools import product
 
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
@@ -362,23 +363,20 @@ class AtrousTransform:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
                 atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv)
 
-            coeffs[slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]] = conv
+            slc = slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]
+            coeffs[slc] = conv
 
             if s == level-1:
                 return
 
             # For given subscale, extracts one pixel out of two on each axis.
-            slc = [[slice(0, None, 2)], [slice(1, None, 2)]]
-            for d in range(1, conv.ndim):
-                n_slc = []
-                for sl in slc:
-                    n_slc.append([slice(0, None, 2), *sl])
-                    n_slc.append([slice(1, None, 2), *sl])
-                slc = n_slc
+            slc = []
+            for p in product(*((0, 1),)*conv.ndim):
+                slc.append(tuple([slice(o, None, 2) for o in p]))
 
             # copy array if 2 dimensions for open-cv requires c-contiguous array
-            c = conv[tuple(sl)].copy() if conv.ndim == 2 else conv[tuple(sl)]
             for sl in slc:
+                c = conv[sl].copy() if conv.ndim == 2 else conv[sl]
                 recursive_convolution(c, s=s + 1, offsets=[o + d.start * 2**s for o, d in zip(offsets, sl)])
 
         kernel = scaling_function.kernel.astype(arr.dtype)
@@ -394,7 +392,8 @@ class AtrousTransform:
         for s in range(level):  # Computes coefficients from convolved arrays
             coeffs[s] -= coeffs[s+1]
 
-        return np.copy(coeffs[slice(0, level+1), *[slice(hw, -hw) for hw in half_widths]])  # remove pads
+        slc = slice(0, level + 1), *[slice(hw, -hw) for hw in half_widths]
+        return np.copy(coeffs[slc])  # remove pads
 
     def atrous_standard(self, arr, level, scaling_function):
         """
