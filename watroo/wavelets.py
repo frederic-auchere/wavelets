@@ -351,7 +351,8 @@ class AtrousTransform:
                 offsets = (0, )*conv.ndim
 
             if self.bilateral is None:
-                convolution(conv, kernel, output=conv)
+                pool.map(convolution, (conv, kernel, conv))
+                # convolution(conv, kernel, output=conv)
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
                 pool.map(atrous_convolution, (conv, kernel, variance, 0, 'reflect', conv))
