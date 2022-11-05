@@ -326,8 +326,6 @@ class AtrousTransform:
         C2  -4  -3  -2  -1   0   1   2   3   4
         """
 
-        pool = Pool(cpu_count())
-
         sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ]*(level+1)
         n_bilateral = len(sigma_bilateral)
         if n_bilateral <= level:
@@ -351,12 +349,10 @@ class AtrousTransform:
                 offsets = (0, )*conv.ndim
 
             if self.bilateral is None:
-                pool.starmap(convolution, (conv, kernel, conv))
-                # convolution(conv, kernel, output=conv)
+                convolution(conv, kernel, output=conv)
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
-                pool.starmap(atrous_convolution, (conv, kernel, variance, 0, 'reflect', conv))
-                # atrous_convolution(conv, kernel, bilateral_variance=variance, mode='reflect', output=conv)
+                atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv)
 
             slc = slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]
             coeffs[slc] = conv
@@ -373,14 +369,12 @@ class AtrousTransform:
         kernel = scaling_function.kernel.astype(arr.dtype)
 
         half_widths = tuple([(s // 2) * 2**(level-1) for s in kernel.shape])
-        arr = np.pad(arr, [(hw,) * 2 for hw in half_widths], mode='reflect')
+        arr = np.pad(arr, [(hw,) * 2 for hw in half_widths], mode='symmetric')
 
         coeffs = np.empty((level+1,) + arr.shape, dtype=arr.dtype)
         coeffs[0] = arr
 
         recursive_convolution(arr)  # Input array is modified-> copy
-        pool.close()
-        pool.join()
 
         for s in range(level):  # Computes coefficients from convolved arrays
             coeffs[s] -= coeffs[s+1]
