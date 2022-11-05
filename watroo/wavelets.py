@@ -76,13 +76,13 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="reflec
 
     for *deltas, k in zip(*indices, kernel[mask]):
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
-        if bilateral_variance is not None:
+        if bilateral_variance is None:
+            output += padded[slc]*k
+        else:
             shifted[:] = padded[slc]
             ne.evaluate('k*exp(-((image - shifted)**2)/bilateral_variance/2)', out=weight)
             norm += weight
             output += shifted*weight
-        else:
-            output += padded[slc]*k
 
     if bilateral_variance is not None:
         output /= norm
@@ -353,7 +353,7 @@ class AtrousTransform:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
                 atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv)
 
-            slc = slice(s + 1, s + 2, 1), *[slice(o, None, 2 ** s) for o in offsets]
+            slc = slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]
             coeffs[slc] = conv
 
             if s == level-1:
@@ -361,9 +361,9 @@ class AtrousTransform:
 
             # For given subscale, extracts one pixel out of two on each axis.
             slice_1d = slice(0, None, 2), slice(1, None, 2)
-            for sl in product(*(slice_1d, )*conv.ndim):
-                c = conv[sl].copy() if conv.ndim == 2 else conv[sl]  # copy if 2-D for open-cv requires c-contiguous
-                recursive_convolution(c, s=s + 1, offsets=[o + d.start * 2**s for o, d in zip(offsets, sl)])
+            for slc in product(*(slice_1d, )*conv.ndim):
+                c = conv[slc].copy() if conv.ndim == 2 else conv[slc]  # copy if 2-D for open-cv requires c-contiguous
+                recursive_convolution(c, s=s + 1, offsets=[o + d.start * 2**s for o, d in zip(offsets, slc)])
 
         kernel = scaling_function.kernel.astype(arr.dtype)
 
