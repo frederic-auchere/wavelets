@@ -6,7 +6,6 @@ from scipy.ndimage import convolve
 import numexpr as ne
 from tqdm import tqdm
 from itertools import product
-from multiprocessing import Pool, cpu_count
 
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
@@ -72,14 +71,7 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
 
     mask = np.ones(kernel.shape, dtype=bool)
     mask[half_widths] = False
-    # indices = np.indices(kernel.shape)
-    # indices = [(shape - 1 - index[mask])*2**s for index, shape in zip(indices, kernel.shape)]
-    # indices = np.meshgrid(*[np.linspace(shape-1, 0, shape, dtype=int)*2**s for shape in kernel.shape], indexing='ij')
     indices = np.meshgrid(*[np.linspace(shape-1, 0, shape, dtype=int)*2**s for shape in kernel.shape], indexing='ij')
-    # for *deltas, k in zip(*indices, kernel[mask]):
-
-    # slice_1d = slice(0, None, 2), slice(1, None, 2)
-    # for slice_nd in product(*(slice_1d,) * conv.ndim):
 
     for *deltas, k in zip(*[index[mask] for index in indices], kernel[mask]):
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
