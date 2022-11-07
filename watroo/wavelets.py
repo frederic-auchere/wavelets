@@ -57,7 +57,7 @@ def convolution(arr, kernel, output=None):
     return output
 
 
-def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="reflect", output=None):
+def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
 
     half_widths = tuple([s//2 for s in kernel.shape])
     padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
@@ -72,10 +72,16 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="reflec
 
     mask = np.ones(kernel.shape, dtype=bool)
     mask[half_widths] = False
-    indices = np.indices(kernel.shape)
-    indices = [(shape - 1 - index[mask])*2**s for index, shape in zip(indices, kernel.shape)]
+    # indices = np.indices(kernel.shape)
+    # indices = [(shape - 1 - index[mask])*2**s for index, shape in zip(indices, kernel.shape)]
+    # indices = np.meshgrid(*[np.linspace(shape-1, 0, shape, dtype=int)*2**s for shape in kernel.shape], indexing='ij')
+    indices = np.meshgrid(*[np.linspace(shape-1, 0, shape, dtype=int)*2**s for shape in kernel.shape], indexing='ij')
+    # for *deltas, k in zip(*indices, kernel[mask]):
 
-    for *deltas, k in zip(*indices, kernel[mask]):
+    # slice_1d = slice(0, None, 2), slice(1, None, 2)
+    # for slice_nd in product(*(slice_1d,) * conv.ndim):
+
+    for *deltas, k in zip(*[index[mask] for index in indices], kernel[mask]):
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
         if bilateral_variance is None:
             output += padded[slc]*k
@@ -279,7 +285,7 @@ class AtrousTransform:
     Astronomical Data Analysis, Springer-Verlag
     """""
 
-    def __init__(self, scaling_function_class=B3spline, bilateral=None, bilateral_scaling=True):
+    def __init__(self, scaling_function_class=B3spline, bilateral=None, bilateral_scaling=False):
         """
         scaling_function: the base scaling function. The default is a b3spline.
         """
@@ -348,23 +354,26 @@ class AtrousTransform:
             if offsets is None:
                 offsets = (0, )*conv.ndim
 
+            out_slc = slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]
             if self.bilateral is None:
                 convolution(conv, kernel, output=conv)
+                coeffs[out_slc] = conv
             else:
                 variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
-                atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=conv)
-
-            slc = slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]
-            coeffs[slc] = conv
+                if self.bilateral_scaling:
+                    variance *= s+1
+                atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=coeffs[out_slc])
+                conv = coeffs[out_slc][0]
 
             if s == level-1:
                 return
 
             # For given subscale, extracts one pixel out of two on each axis.
             slice_1d = slice(0, None, 2), slice(1, None, 2)
-            for slc in product(*(slice_1d, )*conv.ndim):
-                c = conv[slc].copy() if conv.ndim == 2 else conv[slc]  # copy if 2-D for open-cv requires c-contiguous
-                recursive_convolution(c, s=s + 1, offsets=[o + d.start * 2**s for o, d in zip(offsets, slc)])
+            for slice_nd in product(*(slice_1d, )*conv.ndim):
+                # copy if 2-D for open-cv requires c-contiguous arrays
+                c = conv[slice_nd].copy() if conv.ndim == 2 and self.bilateral is None else conv[slice_nd]
+                recursive_convolution(c, s=s + 1, offsets=[o + d.start * 2**s for o, d in zip(offsets, slice_nd)])
 
         kernel = scaling_function.kernel.astype(arr.dtype)
 
