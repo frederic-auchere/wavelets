@@ -333,7 +333,7 @@ class AtrousTransform:
             """
             Recursively computes the 'à trous' convolution of the input array by
             extracting 'à trous' sub-arrays instead of using an 'à trous' kernel.
-            This can be faster than convolving with an 'à trous' kernel since the
+            This can be faster than to convolve with an 'à trous' kernel since the
             latter takes time to compute the contribution of the zeros ('trous')
             of the kernel while it is zero by definition and is thus unnecessary.
             There is overhead due to the necessary copy of the 'à trous' sub-arrays
