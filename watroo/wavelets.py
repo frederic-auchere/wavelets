@@ -101,7 +101,7 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
         return None
     if isinstance(kernel, np.ndarray) and kernel.dtype == np.float64 and len(kernel.shape)== 2 :
         kd1 = kernel.shape[0]
-        kd2 = kernel.shape[1]
+        # assuming square kd2 = kernel.shape[1]
     else:
         print("kernel/type/shape unimplemented in C")
         return None
@@ -121,10 +121,11 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
 
     im = image.reshape(id1*id2,order='C')
 
-    rtc= lib.atrous(ctypes.c_void_p(im.ctypes.data), ctypes.c_int(id1),ctypes.c_int(id2), ctypes.c_void_p(kernel.ctypes.data), ctypes.c_int(kd1),ctypes.c_int(kd2), ctypes.c_void_p(bilateral_variance.ctypes.data),ctypes.c_int(bd1),ctypes.c_int(bd2), ctypes.c_int(s), mode, ctypes.c_void_p(output.ctypes.data))
+    rtc= lib.atrous(ctypes.c_void_p(im.ctypes.data), ctypes.c_int(id1),ctypes.c_int(id2), ctypes.c_void_p(kernel.ctypes.data), ctypes.c_int(kd1), ctypes.c_void_p(bilateral_variance.ctypes.data),ctypes.c_int(bd1),ctypes.c_int(bd2), ctypes.c_int(s),  ctypes.c_void_p(output.ctypes.data))
 
     print('return code from c ', rtc)
-    
+    if rtc != 0:
+        exit
     return output
 
 class Coefficients:
