@@ -38,6 +38,7 @@ int atrous(double *image, int id1, int id2,
 
   for(int j=0; j< id2; j++) {
     for (int i=0;i< id1; i++) {
+      
     }
   }
 
