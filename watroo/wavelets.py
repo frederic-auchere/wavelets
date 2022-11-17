@@ -8,6 +8,9 @@ from tqdm import tqdm
 from itertools import product
 from os import system
 
+import ctypes
+    
+
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
 
 
@@ -109,18 +112,16 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
         print("bilateral_variance/type/shape unimplemented in C")
         return None
 
-    print("s ", type(s))
-    print("mode ", type (mode) )
-
-    from ctypes import cdll
-    import subprocess
+    system("gcc atrous.c -fPIC -shared -o atrous.so ")
+    lib =  ctypes.cdll.LoadLibrary('./atrous.so')
+    lib.atrous.restype = ctypes.c_int
     
-    system("gcc -fPIC -shared -o atrous.so atrous.c")
-    lib =  cdll.LoadLibrary('./atrous.so')
-    
-    output = np.empty(image.shape, dtype=image.dtype)
+    if output is None:
+        output = np.empty_like(image)
 
-    rtc= lib.atrous(image.ctypes.data, id1,id2, kernel.ctypes.data, kd1,kd2, bilateral_variance.ctypes.data,bd1,bd2, s, mode, output.ctypes.data)
+    im = image.reshape(id1*id2,order='C')
+
+    rtc= lib.atrous(ctypes.c_void_p(im.ctypes.data), ctypes.c_int(id1),ctypes.c_int(id2), ctypes.c_void_p(kernel.ctypes.data), ctypes.c_int(kd1),ctypes.c_int(kd2), ctypes.c_void_p(bilateral_variance.ctypes.data),ctypes.c_int(bd1),ctypes.c_int(bd2), ctypes.c_int(s), mode, ctypes.c_void_p(output.ctypes.data))
 
     print('return code from c ', rtc)
     
