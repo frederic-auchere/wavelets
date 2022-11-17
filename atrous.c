@@ -11,13 +11,11 @@ int atrous(double *image, int id1, int id2,
   // output init by image multiply by center of kernel
   int kcenter;
   kcenter = kd1*(kd2/2)+kd1/2;
-  fprintf(stderr,"kcenter %d %lf\n",kcenter, *kernel);
-  
-  
+  fprintf(stderr,"kcenter %d %lf\n",kcenter, kernel[kcenter]);
 
-  //fprintf(stderr," %lf ", image[2048]);
+  fprintf(stderr," %lf \n", image[2048]);
 
-  //for (int i=0; i < id1*id2; i++) output[i]= image[i]*kernel[kcenter];
+  for (int i=0; i < id1*id2; i++) output[i]= image[i]*kernel[kcenter];
   
   return(0);
 }
