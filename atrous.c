@@ -1,8 +1,20 @@
 #include <stdio.h>
 
-extern int toto(int i);
+extern int atrous(double *image, int id1, int id2,
+		  double* kernel, int kd1, int kd2,
+		  double *bilateral_variance, int bd1, int bd2,
+		  int s,
+		  char *,
+		  double *output);
 
+int atrous (double *image, int id1, int id2,
+		  double* kernel, int kd1, int kd2,
+		  double *bilateral_variance, int bd1, int bd2,
+		  int s,
+		  char *,
+		  double *output)
+{
 
-int toto(int i) {
-	return i * i;
+  
+  return(0);
 }

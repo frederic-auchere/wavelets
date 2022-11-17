@@ -6,7 +6,7 @@ from scipy.ndimage import convolve
 import numexpr as ne
 from tqdm import tqdm
 from itertools import product
-
+from os import system
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
 
@@ -56,7 +56,7 @@ def convolution(arr, kernel, output=None):
     return output
 
 
-def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
+def p_atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
 
     half_widths = tuple([s//2 for s in kernel.shape])
     padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
@@ -88,6 +88,43 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
 
     return output
 
+def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
+
+    if isinstance(image, np.ndarray) and image.dtype == np.float64 and len(image.shape)== 2 :
+        id1 = image.shape[0]
+        id2 = image.shape[1]
+    else:
+        print("image/type/shape unimplemented in C")
+        return None
+    if isinstance(kernel, np.ndarray) and kernel.dtype == np.float64 and len(kernel.shape)== 2 :
+        kd1 = kernel.shape[0]
+        kd2 = kernel.shape[1]
+    else:
+        print("kernel/type/shape unimplemented in C")
+        return None
+    if isinstance(bilateral_variance, np.ndarray) and bilateral_variance.dtype == np.float64 and len(bilateral_variance.shape)== 2 :
+        bd1 = bilateral_variance.shape[0]
+        bd2 = bilateral_variance.shape[1]
+    else:
+        print("bilateral_variance/type/shape unimplemented in C")
+        return None
+
+    print("s ", type(s))
+    print("mode ", type (mode) )
+
+    from ctypes import cdll
+    import subprocess
+    
+    system("gcc -fPIC -shared -o atrous.so atrous.c")
+    lib =  cdll.LoadLibrary('./atrous.so')
+    
+    output = np.empty(image.shape, dtype=image.dtype)
+
+    rtc= lib.atrous(image.ctypes.data, id1,id2, kernel.ctypes.data, kd1,kd2, bilateral_variance.ctypes.data,bd1,bd2, s, mode, output.ctypes.data)
+
+    print('return code from c ', rtc)
+    
+    return output
 
 class Coefficients:
 

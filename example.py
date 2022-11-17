@@ -3,16 +3,6 @@ import cProfile
 from watroo import wow
 from astropy.io import fits
 
-from ctypes import *
-
-so_file = "./atrous.so"
-
-lib = cdll.LoadLibrary(so_file)
-
-i = lib.toto(3)
-
-print('i ',i)
-
 image = fits.getdata('solo_L2_eui-hrieuv174-image_20220317T032000234_V01.fits')
 
 #start = time.perf_counter()
