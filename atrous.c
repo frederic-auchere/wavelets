@@ -13,7 +13,7 @@ int atrous(double *image, int id1, int id2,
   int kcenter;
   int half_k = kd/2; 
   kcenter = kd*half_k+half_k;
-  fprintf(stderr,"kcenter %d %lf  half_k %d \n",kcenter, kernel[kcenter], half_k);
+  //fprintf(stderr,"kcenter %d %lf  half_k %d \n",kcenter, kernel[kcenter], half_k);
 
   double * padded;
   int p1, p2, inc;

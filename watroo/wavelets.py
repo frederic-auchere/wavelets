@@ -118,7 +118,6 @@ def atrous_convolution_c(lib,image, kernel, bilateral_variance=None, s=0, output
 
     rtc= lib.atrous(ctypes.c_void_p(image.ctypes.data), ctypes.c_int(id1),ctypes.c_int(id2), ctypes.c_void_p(kernel.ctypes.data), ctypes.c_int(kd1), ctypes.c_void_p(bilateral_variance.ctypes.data),ctypes.c_int(bd1),ctypes.c_int(bd2), ctypes.c_int(s),  ctypes.c_void_p(output.ctypes.data))
 
-    print('return code from c ', rtc)
     if rtc != 0:
         exit
     return output
@@ -460,7 +459,7 @@ class AtrousTransform:
         """
         copy of above except for c loading
         """
-        system("gcc atrous.c -O3 -fPIC -shared -o atrous.so ")
+        system("gcc atrous.c -O2 -fPIC -shared -o atrous.so ")
         lib =  ctypes.cdll.LoadLibrary('./atrous.so')
         lib.atrous.restype = ctypes.c_int
 
