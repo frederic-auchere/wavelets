@@ -14,15 +14,18 @@ int atrous(double *image, int id1, int id2,
   int half_k = kd/2; 
   kcenter = kd*half_k+half_k;
   fprintf(stderr,"kcenter %d %lf  half_k %d \n",kcenter, kernel[kcenter], half_k);
-  //? for (int i=0; i < id1*id2; i++) output[i]= image[i]*kernel[kcenter];
 
   double * padded;
   int p1, p2, inc;
-  inc = half_k*pow(2,s)*2;
+  int pow_s;
+  pow_s = pow(2,s);
+  
+  inc = half_k*pow_s*2;
   p1 = (id1 + inc);
   p2 = (id2 + inc);
-  fprintf(stderr,"s = %d padded size (%d,%d) \n",s, p1,p2);
+  //fprintf(stderr,"s = %d pow_s %d inc %d padded size (%d,%d) \n",s, pow_s, inc, p1,p2);
   padded = (double *) malloc(sizeof(double) * p1*p2);
+  
   int hinc = inc/2;
   for(int j=0,y=hinc; j<p2; j++) {
     if (y<0 || y >=id2) {fprintf(stderr, "err %d %d \n",j,y);return(2);}
@@ -36,13 +39,25 @@ int atrous(double *image, int id1, int id2,
     y += (j<hinc||(j+1)>=(hinc+id2) ? -1 : +1);
   }
 
+  double norm, weight, shifted;
+  int l,m;
   for(int j=0; j< id2; j++) {
     for (int i=0;i< id1; i++) {
-      
+      output[j*id1+i]=image[j*id1+i]*kernel[kcenter];
+      for (int y= -half_k; y< half_k; y++) {
+	m = y*pow_s;
+	norm = kernel[kcenter];
+	for (int x = -half_k; x< half_k; x++) {
+	  l = x*pow_s;
+	  shifted = padded[((j+hinc)+m)*p1+(i+hinc)+l];
+	  weight = kernel[y*half_k+x]* exp(-((image[j*id1+i]-shifted)*(image[j*id1+i]-shifted))/bilateral_variance[j*id1+i]/2);
+	  norm += weight;
+	  //if(i==1024 && j==1024) fprintf(stderr,"i %d j %d x %d y %d m %d l %d   shift (%d,%d) \n",i,j,x,y,m,l,(i+hinc)+l,(j+hinc)+m);
+	}
+      }
+      output[j*id1+i] = (output[j*id1+i] + (shifted*weight))/norm;
     }
   }
-
-  fprintf(stderr," %lf \n", image[2048]);
 
   
   return(0);

@@ -59,7 +59,7 @@ def convolution(arr, kernel, output=None):
     return output
 
 
-def p_atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
+def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
 
     half_widths = tuple([s//2 for s in kernel.shape])
     padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
@@ -91,8 +91,8 @@ def p_atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symm
 
     return output
 
-def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
-
+def atrous_convolution_c(lib,image, kernel, bilateral_variance=None, s=0, output=None):
+    # mode always symetric
     if isinstance(image, np.ndarray) and image.dtype == np.float64 and len(image.shape)== 2 :
         id1 = image.shape[0]
         id2 = image.shape[1]
@@ -112,16 +112,11 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
         print("bilateral_variance/type/shape unimplemented in C")
         return None
 
-    system("gcc atrous.c -fPIC -shared -o atrous.so ")
-    lib =  ctypes.cdll.LoadLibrary('./atrous.so')
-    lib.atrous.restype = ctypes.c_int
     
     if output is None:
         output = np.empty_like(image)
 
-    im = image.reshape(id1*id2,order='C')
-
-    rtc= lib.atrous(ctypes.c_void_p(im.ctypes.data), ctypes.c_int(id1),ctypes.c_int(id2), ctypes.c_void_p(kernel.ctypes.data), ctypes.c_int(kd1), ctypes.c_void_p(bilateral_variance.ctypes.data),ctypes.c_int(bd1),ctypes.c_int(bd2), ctypes.c_int(s),  ctypes.c_void_p(output.ctypes.data))
+    rtc= lib.atrous(ctypes.c_void_p(image.ctypes.data), ctypes.c_int(id1),ctypes.c_int(id2), ctypes.c_void_p(kernel.ctypes.data), ctypes.c_int(kd1), ctypes.c_void_p(bilateral_variance.ctypes.data),ctypes.c_int(bd1),ctypes.c_int(bd2), ctypes.c_int(s),  ctypes.c_void_p(output.ctypes.data))
 
     print('return code from c ', rtc)
     if rtc != 0:
@@ -337,7 +332,8 @@ class AtrousTransform:
             raise ValueError("Unsupported number of dimensions")
 
         scaling_function = self.scaling_function_class(arr.ndim)
-        method = self.atrous_recursive if recursive else self.atrous_standard
+#        method = self.atrous_recursive if recursive else self.atrous_standard
+        method = self.atrous_recursive if recursive else self.atrous_c
         return Coefficients(
                             method(arr, level, scaling_function),
                             scaling_function,
@@ -455,6 +451,39 @@ class AtrousTransform:
                 kernel = scaling_function.kernel.astype(arr.dtype)
                 atrous_convolution(coeffs[s], kernel,
                                    bilateral_variance=variance, s=s, mode='symmetric', output=coeffs[s+1])
+
+            coeffs[s] -= coeffs[s + 1]
+
+        return coeffs
+
+    def atrous_c(self, arr, level, scaling_function):
+        """
+        copy of above except for c loading
+        """
+        system("gcc atrous.c -O3 -fPIC -shared -o atrous.so ")
+        lib =  ctypes.cdll.LoadLibrary('./atrous.so')
+        lib.atrous.restype = ctypes.c_int
+
+
+        sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ]*(level+1)
+        n_bilateral = len(sigma_bilateral)
+        if n_bilateral <= level:
+            sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
+
+        coeffs = np.empty((level + 1,) + arr.shape, dtype=arr.dtype)
+        coeffs[0] = arr
+
+        for s in range(level):  # Chained convolution
+
+            atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
+            if self.bilateral is None:
+                convolution(coeffs[s], atrous_kernel, output=coeffs[s+1])
+            else:
+                variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
+                if self.bilateral_scaling:
+                    variance *= s+1
+                kernel = scaling_function.kernel.astype(arr.dtype)
+                atrous_convolution_c(lib,coeffs[s], kernel, bilateral_variance=variance, s=s, output=coeffs[s+1])
 
             coeffs[s] -= coeffs[s + 1]
 
