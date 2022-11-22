@@ -1,1 +1,1 @@
-gcc -fPIC -shared -o atrous.so atrous.c
+gcc -I /usr/include/cfitsio -fPIC -shared -o atrous.so atrous.c

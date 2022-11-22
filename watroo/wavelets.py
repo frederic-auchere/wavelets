@@ -7,6 +7,7 @@ import numexpr as ne
 from tqdm import tqdm
 from itertools import product
 from os import system
+from astropy.io import fits
 
 import ctypes
     
@@ -63,6 +64,7 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
 
     half_widths = tuple([s//2 for s in kernel.shape])
     padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
+
     if output is None:
         output = np.empty_like(image)
     output[:] = kernel[half_widths] * image
@@ -331,8 +333,7 @@ class AtrousTransform:
             raise ValueError("Unsupported number of dimensions")
 
         scaling_function = self.scaling_function_class(arr.ndim)
-#        method = self.atrous_recursive if recursive else self.atrous_standard
-        method = self.atrous_recursive if recursive else self.atrous_c
+        method = self.atrous_recursive if recursive else self.atrous_standard
         return Coefficients(
                             method(arr, level, scaling_function),
                             scaling_function,
@@ -429,41 +430,12 @@ class AtrousTransform:
         level: desired number of scales. The output has level + 1 planes
         scaling_function: the base scaling function.
         """
-
-        sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ]*(level+1)
-        n_bilateral = len(sigma_bilateral)
-        if n_bilateral <= level:
-            sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
-
-        coeffs = np.empty((level + 1,) + arr.shape, dtype=arr.dtype)
-        coeffs[0] = arr
-
-        for s in range(level):  # Chained convolution
-
-            atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
-            if self.bilateral is None:
-                convolution(coeffs[s], atrous_kernel, output=coeffs[s+1])
-            else:
-                variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
-                if self.bilateral_scaling:
-                    variance *= s+1
-                kernel = scaling_function.kernel.astype(arr.dtype)
-                atrous_convolution(coeffs[s], kernel,
-                                   bilateral_variance=variance, s=s, mode='symmetric', output=coeffs[s+1])
-
-            coeffs[s] -= coeffs[s + 1]
-
-        return coeffs
-
-    def atrous_c(self, arr, level, scaling_function):
-        """
-        copy of above except for c loading
-        """
-        system("gcc atrous.c -O2 -fPIC -shared -o atrous.so ")
+        c = 1  # switch for c or python version
+        #if c == 1:
+        system("gcc atrous.c -I /usr/include/cfitsio -O2 -fPIC -shared -o atrous.so -lcfitsio ")
         lib =  ctypes.cdll.LoadLibrary('./atrous.so')
         lib.atrous.restype = ctypes.c_int
 
-
         sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ]*(level+1)
         n_bilateral = len(sigma_bilateral)
         if n_bilateral <= level:
@@ -482,7 +454,14 @@ class AtrousTransform:
                 if self.bilateral_scaling:
                     variance *= s+1
                 kernel = scaling_function.kernel.astype(arr.dtype)
-                atrous_convolution_c(lib,coeffs[s], kernel, bilateral_variance=variance, s=s, output=coeffs[s+1])
+                if c == 1:
+                    atrous_convolution_c(lib,coeffs[s], kernel, bilateral_variance=variance, s=s, output=coeffs[s+1])
+                    fn = 'outc_'+str(s)+'.fits'
+                else:
+                    atrous_convolution(coeffs[s], kernel,
+                                   bilateral_variance=variance, s=s, mode='symmetric', output=coeffs[s+1])
+                    fn = 'outp_'+str(s)+'.fits'
+                fits.writeto(fn, coeffs[s+1] , overwrite=True)
 
             coeffs[s] -= coeffs[s + 1]
 

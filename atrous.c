@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include<math.h> 
+#include <math.h>
+
+#include "fitsio.h"
 
 int atrous(double *image, int id1, int id2,
 		  double* kernel, int kd,
@@ -33,11 +35,28 @@ int atrous(double *image, int id1, int id2,
       //checks
       if (x<0 || x >=id1) {fprintf(stderr, "err %d %d %d %d\n",i,j,x,y);return(1);}
       //fprintf(stderr,"i %d j%d x %d y %d \n",i,j,x,y);
-      padded[j*p1+i]= image[x*id1+y];  
+      padded[j*p1+i]= image[y*id1+x];  
       x += (i<hinc||(i+1)>=(hinc+id1) ? -1 : +1);
     }
     y += (j<hinc||(j+1)>=(hinc+id2) ? -1 : +1);
   }
+
+  // bordel pour ecrire le fichier fits
+  fitsfile *fptr;
+  char filename[80], cmd[80];
+  sprintf(filename, "padded_c_%d.fits",s);
+  sprintf(cmd,"rm padded_c_%d.fits",s);
+  system(cmd);
+  int bitpix   =  64;
+  long naxis    =   2;
+  long naxes[2] = { p1, p2 };
+  int status = 0;
+  fits_create_file(&fptr, filename, &status);
+  fits_create_img(fptr,  bitpix, naxis, naxes, &status);
+  status=0;
+  if (fits_write_img(fptr, TDOUBLE, 1, p1*p2, padded, &status) ) fprintf(stderr,"write img status %d",status);
+  fits_close_file(fptr, &status); 
+
 
   double norm, weight, shifted;
   int l,m;
