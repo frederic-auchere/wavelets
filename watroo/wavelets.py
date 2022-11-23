@@ -67,10 +67,10 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
 
     if output is None:
         output = np.empty_like(image)
-    output[:] = kernel[half_widths] * image
+    output[:] = kernel[half_widths] * image #a
 
     if bilateral_variance is not None:
-        norm = np.full_like(image, kernel[half_widths])
+        norm = np.full_like(image, kernel[half_widths]) #b
         shifted = np.empty_like(image)
         weight = np.empty_like(image)
 
@@ -117,6 +117,10 @@ def atrous_convolution_c(lib,image, kernel, bilateral_variance=None, s=0, output
     
     if output is None:
         output = np.empty_like(image)
+
+    debug_filename = "image_pc_"+str(s)+".fits"
+    fits.writeto(debug_filename, image, overwrite=True)
+
 
     rtc= lib.atrous(ctypes.c_void_p(image.ctypes.data), ctypes.c_int(id1),ctypes.c_int(id2), ctypes.c_void_p(kernel.ctypes.data), ctypes.c_int(kd1), ctypes.c_void_p(bilateral_variance.ctypes.data),ctypes.c_int(bd1),ctypes.c_int(bd2), ctypes.c_int(s),  ctypes.c_void_p(output.ctypes.data))
 

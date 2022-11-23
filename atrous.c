@@ -17,7 +17,7 @@ int atrous(double *image, int id1, int id2,
   kcenter = kd*half_k+half_k;
   //fprintf(stderr,"kcenter %d %lf  half_k %d \n",kcenter, kernel[kcenter], half_k);
 
-  double * padded;
+  double * padded, *shifted, *padded, *norm;
   int p1, p2, inc;
   int pow_s;
   pow_s = pow(2,s);
@@ -27,6 +27,9 @@ int atrous(double *image, int id1, int id2,
   p2 = (id2 + inc);
   //fprintf(stderr,"s = %d pow_s %d inc %d padded size (%d,%d) \n",s, pow_s, inc, p1,p2);
   padded = (double *) malloc(sizeof(double) * p1*p2);
+  shifted = (double *) malloc (sizeof(double) * id1*id2);
+  weight = (double *) malloc  (sizeof(double) * id1*id2);
+  norm = (double *) malloc  (sizeof(double) * id1*id2);
   
   int hinc = inc/2;
   for(int j=0,y=hinc; j<p2; j++) {
@@ -47,7 +50,7 @@ int atrous(double *image, int id1, int id2,
   sprintf(filename, "padded_c_%d.fits",s);
   sprintf(cmd,"rm padded_c_%d.fits",s);
   system(cmd);
-  int bitpix   =  64;
+  int bitpix   =  -64;
   long naxis    =   2;
   long naxes[2] = { p1, p2 };
   int status = 0;
@@ -56,22 +59,34 @@ int atrous(double *image, int id1, int id2,
   status=0;
   if (fits_write_img(fptr, TDOUBLE, 1, p1*p2, padded, &status) ) fprintf(stderr,"write img status %d",status);
   fits_close_file(fptr, &status); 
+  //debug
+  sprintf(filename, "image_c_%d.fits",s);
+  sprintf(cmd,"rm image_c_%d.fits",s);
+  system(cmd);
+  naxes[0] = id1; naxes[1]=id2;
+  fits_create_file(&fptr, filename, &status);
+  fits_create_img(fptr,  bitpix, naxis, naxes, &status);
+  status=0;
+  if (fits_write_img(fptr, TDOUBLE, 1, p1*p2, image, &status) ) fprintf(stderr,"write img status %d",status);
+  fits_close_file(fptr, &status); 
 
+  for(int j=0;j<id2;j++)
+    for (int i=0;i<id1,i++)
+      norm[j*d1+i]=kernel[kcenter];
 
-  double norm, weight, shifted;
   int l,m;
   for(int j=0; j< id2; j++) {
     for (int i=0;i< id1; i++) {
-      output[j*id1+i]=image[j*id1+i]*kernel[kcenter];
-      for (int y= -half_k; y< half_k; y++) {
+      output[j*id1+i]=image[j*id1+i]*kernel[kcenter];//a
+      for (int y= -half_k; y<= half_k; y++) {
 	m = y*pow_s;
-	norm = kernel[kcenter];
-	for (int x = -half_k; x< half_k; x++) {
+	//norm = kernel[kcenter]; // b
+	for (int x = -half_k; x<= half_k; x++) {
 	  l = x*pow_s;
-	  shifted = padded[((j+hinc)+m)*p1+(i+hinc)+l];
-	  weight = kernel[y*half_k+x]* exp(-((image[j*id1+i]-shifted)*(image[j*id1+i]-shifted))/bilateral_variance[j*id1+i]/2);
-	  norm += weight;
-	  //if(i==1024 && j==1024) fprintf(stderr,"i %d j %d x %d y %d m %d l %d   shift (%d,%d) \n",i,j,x,y,m,l,(i+hinc)+l,(j+hinc)+m);
+	  shifted[j*id1+i] = padded[((j+hinc)+m)*p1+(i+hinc)+l];
+	  weight[j*id1+i] = kernel[(y+half_k)*kd+(x+half_k)]* exp(-((image[j*id1+i]-shifted)*(image[j*id1+i]-shifted))/bilateral_variance[j*id1+i]/2);
+	  // norm += weight;
+	  //if((i==0 || i==1024) && j==1024) fprintf(stderr,"i %d j %d x %d y %d m %d l %d   shift (%d,%d) \n",i,j,x,y,m,l,(i+hinc)+l,(j+hinc)+m);
 	}
       }
       output[j*id1+i] = (output[j*id1+i] + (shifted*weight))/norm;
