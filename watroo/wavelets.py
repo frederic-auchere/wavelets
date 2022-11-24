@@ -80,11 +80,15 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
 
     for *deltas, k in zip(*[index[mask] for index in indices], kernel[mask]):
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
+        #print(slc)
         if bilateral_variance is None:
             output += padded[slc]*k
         else:
             shifted[:] = padded[slc]
             ne.evaluate('k*exp(-((image - shifted)**2)/bilateral_variance/2)', out=weight)
+            a=1224
+            b=200
+            print ('shifted (',a,',',b,')= ',shifted[a,b]," weight ",weight[a,b], '   ', slc )
             norm += weight
             output += shifted*weight
 
