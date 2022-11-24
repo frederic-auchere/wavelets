@@ -56,10 +56,14 @@ def convolution(arr, kernel, output=None):
     return output
 
 
-def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
+def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None, randomize=False):
 
     half_widths = tuple([s//2 for s in kernel.shape])
-    padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
+    if randomize and s > 0:
+        padded = np.pad(image, [(1+hw*2**s,)*2 for hw in half_widths], mode=mode)
+    else:
+        padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
+
     if output is None:
         output = np.empty_like(image)
     output[:] = kernel[half_widths] * image
@@ -72,6 +76,10 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
     mask = np.ones(kernel.shape, dtype=bool)
     mask[half_widths] = False
     indices = np.meshgrid(*[np.linspace(shape-1, 0, shape, dtype=int)*2**s for shape in kernel.shape], indexing='ij')
+    if randomize and s > 0:
+        for idx in indices:
+            idx += np.random.randint(0, high=3, size=idx.shape)
+            print(idx)
 
     for *deltas, k in zip(*[index[mask] for index in indices], kernel[mask]):
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
@@ -417,7 +425,7 @@ class AtrousTransform:
                 if self.bilateral_scaling:
                     variance *= s+1
                 kernel = scaling_function.kernel.astype(arr.dtype)
-                atrous_convolution(coeffs[s], kernel,
+                atrous_convolution(coeffs[s], kernel, randomize=True,
                                    bilateral_variance=variance, s=s, mode='symmetric', output=coeffs[s+1])
 
             coeffs[s] -= coeffs[s + 1]
