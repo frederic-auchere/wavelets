@@ -1,8 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <unistd.h>
+#include <pthread.h>
 
-#include "fitsio.h"
+//#include "fitsio.h"
+
+
 
 int atrous(double *image, int id1, int id2,
 		  double* kernel, int kd,
@@ -57,8 +61,12 @@ int atrous(double *image, int id1, int id2,
       output[j*id1+i]=image[j*id1+i]*kernel[kcenter];
     }
 
-  int l,m; double shifted_s,weight_s;
-  for (int y= half_k; y>= -half_k; y--) {
+
+  void *boucle_k(void *y_pointer)
+  {
+    
+    int l,m; double shifted_s,weight_s;
+    int y = *((int *)y_pointer);
     m = y*pow_s;
     for (int x = half_k; x>= -half_k; x--) {
       if (x == 0 && y == 0) continue;
@@ -74,12 +82,25 @@ int atrous(double *image, int id1, int id2,
     }
   }
 
+  // multi thread kernel convol
+  int y[5];
+  pthread_t tid[5];
+  for (int i=0; i<5; i++){
+    y[i]=i-half_k;
+    pthread_create(&(tid[i]), NULL, boucle_k , (void *)&(y[i]));
+    pthread_join(tid[i], NULL);
+  }
+  /* for (int i=0; i<5;i++) { */
+  /*   pthread_join(tid[i], NULL); */
+  /* } */
+
   for(int j=0; j< id2; j++) {
     for (int i=0;i< id1; i++) {
       output[j*id1+i] /= norm[j*id1+i]; 
     }
   }
 
+  
   
   return(0);
 }
