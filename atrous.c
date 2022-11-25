@@ -61,13 +61,12 @@ int atrous(double *image, int id1, int id2,
   for (int y= half_k; y>= -half_k; y--) {
     m = y*pow_s;
     for (int x = half_k; x>= -half_k; x--) {
+      if (x == 0 && y == 0) continue;
       l = x*pow_s;
-      if (x ==0 && y == 0) continue; // mask
       for(int j=0; j< id2; j++) {
 	for (int i=0;i< id1; i++) {
 	  shifted_s = padded[((j+hinc)+m)*p1+(i+hinc)+l];
-	  weight_s = kernel[(y+half_k)*kd+(x+half_k)]*
-	    exp(-((image[j*id1+i]-shifted_s)*(image[j*id1+i]-shifted_s))/bilateral_variance[j*id1+i]/2);
+	  weight_s = kernel[(y+half_k)*kd+(x+half_k)]* exp(-((image[j*id1+i]-shifted_s)*(image[j*id1+i]-shifted_s))/bilateral_variance[j*id1+i]/2);
 	  norm[j*id1+i] +=  weight_s;
 	  output[j*id1+i] = output[j*id1+i] + (shifted_s*weight_s);
 	}
@@ -77,7 +76,7 @@ int atrous(double *image, int id1, int id2,
 
   for(int j=0; j< id2; j++) {
     for (int i=0;i< id1; i++) {
-      output[j*id1+i] /= norm[j*id1+i];
+      output[j*id1+i] /= norm[j*id1+i]; 
     }
   }
 

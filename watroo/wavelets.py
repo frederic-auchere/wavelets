@@ -88,7 +88,7 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
             ne.evaluate('k*exp(-((image - shifted)**2)/bilateral_variance/2)', out=weight)
             a=1224
             b=200
-            print ('shifted (',a,',',b,')= ',shifted[a,b]," weight ",weight[a,b], '   ', slc )
+            #print ('shifted (',a,',',b,')= ',shifted[a,b]," weight ",weight[a,b], '   ', slc )
             norm += weight
             output += shifted*weight
 
@@ -440,7 +440,7 @@ class AtrousTransform:
         """
         c = 1  # switch for c or python version
         #if c == 1:
-        system("gcc atrous.c -I /usr/include/cfitsio -O2 -fPIC -shared -o atrous.so -lcfitsio ")
+        system("gcc atrous.c -I /usr/include/cfitsio -O3 -fPIC -shared -o atrous.so -lcfitsio ")
         lib =  ctypes.cdll.LoadLibrary('./atrous.so')
         lib.atrous.restype = ctypes.c_int
 
