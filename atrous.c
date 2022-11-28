@@ -20,7 +20,7 @@ int atrous(double *image, int id1, int id2,
   int half_k = kd/2; 
   kcenter = kd*half_k+half_k;
 
-  double *padded, *norm;
+  double *padded, *norm, *weight,*shifted;
   int p1, p2, inc;
   int pow_s;
   pow_s = pow(2,s);
@@ -30,6 +30,8 @@ int atrous(double *image, int id1, int id2,
   p2 = (id2 + inc);
   padded = (double *) malloc(sizeof(double) * p1*p2);
   norm = (double *) malloc  (sizeof(double) * id1*id2);
+  weight =  (double *) malloc  (sizeof(double) * id1*id2);
+  shifted =  (double *) malloc  (sizeof(double) * id1*id2);
   
   int hinc = inc/2;
   for(int j=0; j<id2; j++) {
@@ -61,38 +63,41 @@ int atrous(double *image, int id1, int id2,
       output[j*id1+i]=image[j*id1+i]*kernel[kcenter];
     }
 
+#define NB_THREAD 4
 
   void *boucle_k(void *y_pointer)
   {
     
-    int l,m; double shifted_s,weight_s;
+    int l,m;
     int y = *((int *)y_pointer);
-    m = y*pow_s;
-    for (int x = half_k; x>= -half_k; x--) {
-      if (x == 0 && y == 0) continue;
-      l = x*pow_s;
-      for(int j=0; j< id2; j++) {
-	for (int i=0;i< id1; i++) {
-	  shifted_s = padded[((j+hinc)+m)*p1+(i+hinc)+l];
-	  weight_s = kernel[(y+half_k)*kd+(x+half_k)]* exp(-((image[j*id1+i]-shifted_s)*(image[j*id1+i]-shifted_s))/bilateral_variance[j*id1+i]/2);
-	  norm[j*id1+i] +=  weight_s;
-	  output[j*id1+i] = output[j*id1+i] + (shifted_s*weight_s);
+    
+    for(int j=y; j< (y+id2/NB_THREAD); j++) {
+      for (int i=0;i< id1; i++) {
+	for (int y = half_k; y>= -half_k; y--) {
+	  m = y*pow_s;
+	  for (int x = half_k; x>= -half_k; x--) {
+	    if (x == 0 && y == 0) continue;
+	    l = x*pow_s;
+	    shifted[j*id1+i] = padded[((j+hinc)+m)*p1+(i+hinc)+l];
+	    weight[j*id1+i] = kernel[(y+half_k)*kd+(x+half_k)]* exp(-((image[j*id1+i]-shifted[j*id1+i])*(image[j*id1+i]-shifted[j*id1+i]))/bilateral_variance[j*id1+i]/2);
+	    norm[j*id1+i] +=  weight[j*id1+i];
+	    output[j*id1+i] += (shifted[j*id1+i]*weight[j*id1+i]);
+	  }
 	}
       }
     }
   }
 
   // multi thread kernel convol
-  int y[5];
-  pthread_t tid[5];
-  for (int i=0; i<5; i++){
-    y[i]=i-half_k;
+  int y[NB_THREAD];
+  pthread_t tid[NB_THREAD];
+  for (int i=0; i<NB_THREAD; i++){
+    y[i]=id2/NB_THREAD*i;
     pthread_create(&(tid[i]), NULL, boucle_k , (void *)&(y[i]));
+  }
+  for (int i=0; i<NB_THREAD;i++) {
     pthread_join(tid[i], NULL);
   }
-  /* for (int i=0; i<5;i++) { */
-  /*   pthread_join(tid[i], NULL); */
-  /* } */
 
   for(int j=0; j< id2; j++) {
     for (int i=0;i< id1; i++) {
