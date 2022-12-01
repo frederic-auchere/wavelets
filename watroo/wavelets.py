@@ -21,13 +21,9 @@ def generalized_anscombe(signal, alpha=1, g=0, sigma=0, inverse=False):
         return 2*np.sqrt(dum)/alpha
 
 
-def sdev_loc(image, kernel, s=0, variance=False):
-    if s == 0:
-        mean2 = convolution(image, kernel) ** 2
-        vari = convolution(image ** 2, kernel)
-    else:
-        mean2 = atrous_convolution(image, kernel, s=s) ** 2
-        vari = atrous_convolution(image ** 2, kernel, s=s)
+def sdev_loc(image, scaling_function, s=0, variance=False):
+    mean2 = convolution(image, scaling_function, s=s) ** 2
+    vari = convolution(image ** 2, scaling_function, s=s)
     vari -= mean2
     vari[vari <= 0] = 1e-20
     if variance:
@@ -36,10 +32,11 @@ def sdev_loc(image, kernel, s=0, variance=False):
         return np.sqrt(vari)
 
 
-def convolution(arr, kernel, output=None):
+def convolution(arr, scaling_function, s=0, output=None):
     if output is None:
         output = np.empty_like(arr)
     if arr.ndim == 2:
+        kernel = scaling_function.atrous_kernel(s)
         cv2.filter2D(arr,
                      -1,  # Same pixel depth as input
                      kernel,
@@ -48,10 +45,12 @@ def convolution(arr, kernel, output=None):
                      0,  # Optional offset
                      cv2.BORDER_REFLECT)
     else:
-        convolve(arr,
-                 kernel,
-                 output=output,
-                 mode='mirror')
+        kernel = scaling_function.kernel
+        atrous_convolution(arr, kernel, s=s, mode="symmetric", output=output)
+        # convolve(arr,
+        #          kernel,
+        #          output=output,
+        #          mode='mirror')
 
     return output
 
@@ -409,13 +408,13 @@ class AtrousTransform:
 
         for s in range(level):  # Chained convolution
 
-            atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
             if self.bilateral is None:
-                convolution(coeffs[s], atrous_kernel, output=coeffs[s+1])
+                convolution(coeffs[s], scaling_function, s=s, output=coeffs[s+1])
             else:
-                variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
+                variance = sdev_loc(coeffs[s], scaling_function, s=s, variance=True)*sigma_bilateral[s]**2
                 if self.bilateral_scaling:
                     variance *= s+1
+
                 kernel = scaling_function.kernel.astype(arr.dtype)
                 atrous_convolution(coeffs[s], kernel,
                                    bilateral_variance=variance, s=s, mode='symmetric', output=coeffs[s+1])

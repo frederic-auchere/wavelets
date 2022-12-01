@@ -190,8 +190,7 @@ def wow(data,
                 local_power = 1
         else:
             if whitening:
-                atrous_kernel = coefficients.scaling_function.atrous_kernel(s)
-                convolution(power, atrous_kernel, output=local_power)
+                convolution(power, coefficients.scaling_function, s=s, output=local_power)
                 local_power[local_power <= 0] = 1e-15
                 np.sqrt(local_power, out=local_power)
             else:
