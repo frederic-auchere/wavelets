@@ -53,10 +53,15 @@ def convolution(arr, scaling_function, s=0, output=None):
                          0,  # Optional offset
                          cv2.BORDER_REFLECT)
         for i in range(arr.shape[2]):
-            convolve(arr[:, :, i],
-                     np.expand_dims(scaling_function.__class__(1).atrous_kernel(s), axis=1),
-                     output=output[:, :, i],
-                     mode='mirror')
+            dum = np.empty_like(output[:, :, i])
+            cv2.filter2D(np.copy(arr[:, :, i]),
+                         -1,  # Same pixel depth as input
+                         np.expand_dims(scaling_function.__class__(1).atrous_kernel(s), axis=1),
+                         dum,
+                         (-1, -1),  # Anchor is kernel center
+                         0,  # Optional offset
+                         cv2.BORDER_REFLECT)
+            output[:, :, i] = dum
     else:
         convolve(arr,
                  scaling_function.atrous_kernel(s),
