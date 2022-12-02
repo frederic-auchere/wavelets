@@ -8,7 +8,7 @@ from tqdm import tqdm
 from itertools import product
 
 
-__all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
+__all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution', 'convolution2']
 
 
 def generalized_anscombe(signal, alpha=1, g=0, sigma=0, inverse=False):
@@ -22,8 +22,8 @@ def generalized_anscombe(signal, alpha=1, g=0, sigma=0, inverse=False):
 
 
 def sdev_loc(image, scaling_function, s=0, variance=False):
-    mean2 = convolution(image, scaling_function, s=s) ** 2
-    vari = convolution(image ** 2, scaling_function, s=s)
+    mean2 = convolution2(image, scaling_function, s=s) ** 2
+    vari = convolution2(image ** 2, scaling_function, s=s)
     vari -= mean2
     vari[vari <= 0] = 1e-20
     if variance:
@@ -31,14 +31,35 @@ def sdev_loc(image, scaling_function, s=0, variance=False):
     else:
         return np.sqrt(vari)
 
-
-def convolution(arr, scaling_function, s=0, output=None):
+def convolution(arr, kernel, output=None):
     if output is None:
         output = np.empty_like(arr)
     if arr.ndim == 2:
+        print(kernel.shape)
         cv2.filter2D(arr,
                      -1,  # Same pixel depth as input
-                     scaling_function.atrous_kernel(s).astype(arr.dtype),
+                     kernel,
+                     output,
+                     (-1, -1),  # Anchor is kernel center
+                     0,  # Optional offset
+                     cv2.BORDER_REFLECT)
+    else:
+        convolve(arr,
+                 kernel,
+                 output=output,
+                 mode='mirror')
+
+    return output
+
+def convolution2(arr, scaling_function, s=0, output=None):
+    if output is None:
+        output = np.empty_like(arr)
+    if arr.ndim == 2:
+        kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
+        print(s, kernel.shape)
+        cv2.filter2D(arr,
+                     -1,  # Same pixel depth as input
+                     kernel,
                      output,
                      (-1, -1),  # Anchor is kernel center
                      0,  # Optional offset
@@ -430,7 +451,9 @@ class AtrousTransform:
         for s in range(level):  # Chained convolution
 
             if self.bilateral is None:
-                convolution(coeffs[s], scaling_function, s=s, output=coeffs[s+1])
+                # atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
+                # convolution(coeffs[s], atrous_kernel, output=coeffs[s+1])
+                convolution2(coeffs[s], scaling_function, s=s, output=coeffs[s+1])
             else:
                 variance = sdev_loc(coeffs[s], scaling_function, s=s, variance=True)*sigma_bilateral[s]**2
                 if self.bilateral_scaling:

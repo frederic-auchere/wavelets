@@ -1,7 +1,7 @@
 import copy
 import numpy as np
 import warnings
-from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe, convolution
+from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe, convolution2
 
 __all__ = ['denoise', 'wow']
 
@@ -190,7 +190,7 @@ def wow(data,
                 local_power = 1
         else:
             if whitening:
-                convolution(power, coefficients.scaling_function, s=s, output=local_power)
+                convolution2(power, coefficients.scaling_function, s=s, output=local_power)
                 local_power[local_power <= 0] = 1e-15
                 np.sqrt(local_power, out=local_power)
             else:
