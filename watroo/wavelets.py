@@ -36,21 +36,32 @@ def convolution(arr, scaling_function, s=0, output=None):
     if output is None:
         output = np.empty_like(arr)
     if arr.ndim == 2:
-        kernel = scaling_function.atrous_kernel(s)
         cv2.filter2D(arr,
                      -1,  # Same pixel depth as input
-                     kernel,
+                     scaling_function.atrous_kernel(s),
                      output,
                      (-1, -1),  # Anchor is kernel center
                      0,  # Optional offset
                      cv2.BORDER_REFLECT)
+    elif arr.ndim == 3:
+        for i in range(arr.shape[0]):
+            cv2.filter2D(arr[i],
+                         -1,  # Same pixel depth as input
+                         scaling_function.__class__(2).atrous_kernel(s),
+                         output[i],
+                         (-1, -1),  # Anchor is kernel center
+                         0,  # Optional offset
+                         cv2.BORDER_REFLECT)
+        for i in range(arr.shape[2]):
+            convolve(arr[:, :, i],
+                     np.expand_dims(scaling_function.__class__(1).atrous_kernel(s), axis=1),
+                     output=output[:, :, i],
+                     mode='mirror')
     else:
-        kernel = scaling_function.kernel
-        atrous_convolution(arr, kernel, s=s, mode="symmetric", output=output)
-        # convolve(arr,
-        #          kernel,
-        #          output=output,
-        #          mode='mirror')
+        convolve(arr,
+                 scaling_function.atrous_kernel(s),
+                 output=output,
+                 mode='mirror')
 
     return output
 
