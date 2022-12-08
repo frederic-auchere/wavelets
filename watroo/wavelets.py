@@ -8,9 +8,8 @@ from tqdm import tqdm
 from itertools import product
 from os import system
 from astropy.io import fits
-
+import time
 import ctypes
-    
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
 
@@ -25,13 +24,9 @@ def generalized_anscombe(signal, alpha=1, g=0, sigma=0, inverse=False):
         return 2*np.sqrt(dum)/alpha
 
 
-def sdev_loc(image, kernel, s=0, variance=False):
-    if s == 0:
-        mean2 = convolution(image, kernel) ** 2
-        vari = convolution(image ** 2, kernel)
-    else:
-        mean2 = atrous_convolution(image, kernel, s=s) ** 2
-        vari = atrous_convolution(image ** 2, kernel, s=s)
+def sdev_loc(image, scaling_function, s=0, variance=False):
+    mean2 = convolution(image, scaling_function, s=s) ** 2
+    vari = convolution(image ** 2, scaling_function, s=s)
     vari -= mean2
     vari[vari <= 0] = 1e-20
     if variance:
@@ -39,28 +34,86 @@ def sdev_loc(image, kernel, s=0, variance=False):
     else:
         return np.sqrt(vari)
 
+@profile
+def convolution(arr, scaling_function, s=0, output=None):
 
-def convolution(arr, kernel, output=None):
+    print ('       kernel ',scaling_function.atrous_kernel(s).shape)
+    print ('       arr ', arr.shape)
+#    print('truc ', scaling_function.__class__(2).atrous_kernel(s))
+#    print('machin ', np.expand_dims(scaling_function.__class__(1).atrous_kernel(s), axis=1))
+    start = time.time()
+
+
     if output is None:
         output = np.empty_like(arr)
     if arr.ndim == 2:
         cv2.filter2D(arr,
                      -1,  # Same pixel depth as input
-                     kernel,
+                     scaling_function.atrous_kernel(s),
                      output,
                      (-1, -1),  # Anchor is kernel center
                      0,  # Optional offset
                      cv2.BORDER_REFLECT)
+    elif arr.ndim == 34:  ## 10 secondes la convol
+        kernel =  scaling_function.atrous_kernel(0)
+        half_width =  tuple([w//2 for w in kernel.shape])
+        padded = np.pad(arr, [(hw*2**s,)*2 for hw in half_width], mode='symmetric')
+        output[:] = kernel[half_width] * arr
+        mask = np.ones(kernel.shape, dtype=bool)
+        mask[half_width] = False
+        indices = np.meshgrid(*[np.linspace(shape-1, 0, shape, dtype=int)*2**s for shape in kernel.shape], indexing='ij')
+        for *deltas, k in zip(*[index[mask] for index in indices], kernel[mask]):
+            slc = tuple([slice(d, d+s) for d, s in zip(deltas, arr.shape)])
+            output += padded[slc]*k
+    elif arr.ndim == 33: 
+        for i in range(arr.shape[0]):
+            cv2.filter2D(arr[i],
+                         -1,  # Same pixel depth as input
+                         scaling_function.__class__(2).atrous_kernel(s),
+                         output[i],
+                         (-1, -1),  # Anchor is kernel center
+                         0,  # Optional offset
+                         cv2.BORDER_REFLECT)
+        for i in range(arr.shape[2]):
+            dum = np.empty_like(output[:, :, i])
+            cv2.filter2D(np.copy(arr[:, :, i]),
+                         -1,  # Same pixel depth as input
+                         np.expand_dims(scaling_function.__class__(1).atrous_kernel(s), axis=1),
+                         dum,
+                         (-1, -1),  # Anchor is kernel center
+                         0,  # Optional offset
+                         cv2.BORDER_REFLECT)
+            output[:, :, i] = dum
+    elif arr.ndim == 3:
+        for i in range(arr.shape[0]):
+            cv2.filter2D(arr[i],
+                         -1,  # Same pixel depth as input
+                         scaling_function.__class__(2).atrous_kernel(s).astype(arr.dtype),
+                         output[i],
+                         (-1, -1),  # Anchor is kernel center
+                         0,  # Optional offset
+                         cv2.BORDER_REFLECT)
+        for i in range(arr.shape[2]):
+            dum = np.empty_like(output[:, :, i])
+            cv2.filter2D(np.copy(output[:, :, i]),
+                         -1,  # Same pixel depth as input
+                         np.expand_dims(scaling_function.__class__(1).atrous_kernel(s), axis=1),
+                         dum,
+                         (-1, -1),  # Anchor is kernel center
+                         0,  # Optional offset
+                         cv2.BORDER_REFLECT)
+            output[:, :, i] = dum
     else:
-        convolve(arr,
-                 kernel,
-                 output=output,
-                 mode='mirror')
+        convolve(arr, scaling_function.atrous_kernel(s), output=output, mode='mirror')
 
+    finish = time.time()
+    print(f"              convolution finished in {round(finish-start, 2)} s")
     return output
 
-
+@profile
 def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
+
+    print ('start atrous_convolution')
 
     half_widths = tuple([s//2 for s in kernel.shape])
     padded = np.pad(image, [(hw*2**s,)*2 for hw in half_widths], mode=mode)
@@ -78,23 +131,22 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
     mask[half_widths] = False
     indices = np.meshgrid(*[np.linspace(shape-1, 0, shape, dtype=int)*2**s for shape in kernel.shape], indexing='ij')
 
+    s1 = time.time()  # loop below = 5x5x5 steps
     for *deltas, k in zip(*[index[mask] for index in indices], kernel[mask]):
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
-        #print(slc)
         if bilateral_variance is None:
             output += padded[slc]*k
         else:
             shifted[:] = padded[slc]
             ne.evaluate('k*exp(-((image - shifted)**2)/bilateral_variance/2)', out=weight)
-            a=1224
-            b=200
-            #print ('shifted (',a,',',b,')= ',shifted[a,b]," weight ",weight[a,b], '   ', slc )
             norm += weight
             output += shifted*weight
 
     if bilateral_variance is not None:
         output /= norm
 
+    s2 = time.time()
+    print (f"atrous_convolution {s} takes { round(s2-s1,2) }")
     return output
 
 def atrous_convolution_c(lib,image, kernel, bilateral_variance=None, s=0, output=None):
@@ -122,7 +174,7 @@ def atrous_convolution_c(lib,image, kernel, bilateral_variance=None, s=0, output
     if output is None:
         output = np.empty_like(image)
 
-    debug_filename = "image_pc_"+str(s)+".fits"
+    debug_filename = "/run/media/cmercier/LaCie/image_pc_"+str(s)+".fits"
     fits.writeto(debug_filename, image, overwrite=True)
 
 
@@ -391,10 +443,10 @@ class AtrousTransform:
 
             out_slc = slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]
             if self.bilateral is None:
-                convolution(conv, kernel, output=conv)
+                convolution(conv, scaling_function, s=s, output=conv)
                 coeffs[out_slc] = conv
             else:
-                variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
+                variance = sdev_loc(conv, scaling_function, s=s, variance=True)*sigma_bilateral[s]**2
                 if self.bilateral_scaling:
                     variance *= s+1
                 atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=coeffs[out_slc])
@@ -425,7 +477,7 @@ class AtrousTransform:
 
         slc = slice(0, level + 1), *[slice(hw, -hw) for hw in half_widths]
         return np.copy(coeffs[slc])  # remove pads
-
+    @profile
     def atrous_standard(self, arr, level, scaling_function):
         """
         Performs 'à trous' wavelet transform of input array arr over level scales,
@@ -438,11 +490,11 @@ class AtrousTransform:
         level: desired number of scales. The output has level + 1 planes
         scaling_function: the base scaling function.
         """
-        c = 1  # switch for c or python version
+        c = 0  # switch for c or python version
         #if c == 1:
-        system("gcc atrous.c -I /usr/include/cfitsio -O2 -D_REENTRANT -fPIC -shared -o atrous.so -lcfitsio ")
-        lib =  ctypes.cdll.LoadLibrary('./atrous.so')
-        lib.atrous.restype = ctypes.c_int
+        #system("gcc atrous.c -I /usr/include/cfitsio -O2 -D_REENTRANT -fPIC -shared -o atrous.so -lcfitsio ")
+        #lib =  ctypes.cdll.LoadLibrary('./atrous.so')
+        #lib.atrous.restype = ctypes.c_int
 
         sigma_bilateral = copy.copy(self.bilateral) if type(self.bilateral) is list else [self.bilateral, ]*(level+1)
         n_bilateral = len(sigma_bilateral)
@@ -454,22 +506,24 @@ class AtrousTransform:
 
         for s in range(level):  # Chained convolution
 
-            atrous_kernel = scaling_function.atrous_kernel(s).astype(arr.dtype)
             if self.bilateral is None:
-                convolution(coeffs[s], atrous_kernel, output=coeffs[s+1])
+                convolution(coeffs[s], scaling_function, s=s, output=coeffs[s+1])
             else:
-                variance = sdev_loc(coeffs[s], atrous_kernel, variance=True)*sigma_bilateral[s]**2
+                start = time.time()
+                variance = sdev_loc(coeffs[s], scaling_function, s=s, variance=True)*sigma_bilateral[s]**2
                 if self.bilateral_scaling:
                     variance *= s+1
                 kernel = scaling_function.kernel.astype(arr.dtype)
                 if c == 1:
                     atrous_convolution_c(lib,coeffs[s], kernel, bilateral_variance=variance, s=s, output=coeffs[s+1])
-                    fn = 'outc_'+str(s)+'.fits'
+                    fn = '/run/media/cmercier/LaCie/outc_'+str(s)+'.fits'
                 else:
                     atrous_convolution(coeffs[s], kernel,
                                    bilateral_variance=variance, s=s, mode='symmetric', output=coeffs[s+1])
-                    fn = 'outp_'+str(s)+'.fits'
+                    fn = '/run/media/cmercier/LaCie/outp_'+str(s)+'.fits'
                 fits.writeto(fn, coeffs[s+1] , overwrite=True)
+                finish = time.time()
+                print(f"loop {s}    finished in {round(finish-start, 2)} sec.")
 
             coeffs[s] -= coeffs[s + 1]
 
