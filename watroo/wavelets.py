@@ -490,7 +490,7 @@ class AtrousTransform:
         level: desired number of scales. The output has level + 1 planes
         scaling_function: the base scaling function.
         """
-        c = 0  # switch for c or python version
+        c = 0  # switch for c or python version, c=1 c uncomment below, c=2 openvcv bilateral
         #if c == 1:
         #system("gcc atrous.c -I /usr/include/cfitsio -O2 -D_REENTRANT -fPIC -shared -o atrous.so -lcfitsio ")
         #lib =  ctypes.cdll.LoadLibrary('./atrous.so')
@@ -501,8 +501,9 @@ class AtrousTransform:
         if n_bilateral <= level:
             sigma_bilateral.extend([1, ] * (level - n_bilateral + 1))
 
-        coeffs = np.empty((level + 1,) + arr.shape, dtype=arr.dtype)
+        coeffs = np.empty((level + 1,) + arr.shape, dtype=np.float32)##arr.dtype)
         coeffs[0] = arr
+        print("arr type", arr.dtype)
 
         for s in range(level):  # Chained convolution
 
@@ -517,6 +518,12 @@ class AtrousTransform:
                 if c == 1:
                     atrous_convolution_c(lib,coeffs[s], kernel, bilateral_variance=variance, s=s, output=coeffs[s+1])
                     fn = '/run/media/cmercier/LaCie/outc_'+str(s)+'.fits'
+                elif c==2:
+                    d = 2* (int)(2**(s+1)) +1
+                    print('d vaut ', d)
+                    #cv2.bilateralFilter(coeffs[s],coeffs[s+1],d,75,75, cv2.BORDER_REFLECT)
+                    coeffs[s+1] = cv2.bilateralFilter(coeffs[s], d,75,75,cv2.BORDER_REFLECT)
+                    fn = '/run/media/cmercier/LaCie/outb_'+str(s)+'.fits'
                 else:
                     atrous_convolution(coeffs[s], kernel,
                                    bilateral_variance=variance, s=s, mode='symmetric', output=coeffs[s+1])
