@@ -182,14 +182,14 @@ def wow(data,
         else:
             power_norm = 1
         if s == n_scales:
-            if whitening:
+            if whitening and h < 1:
                 local_power = np.std(c)
                 if local_power <= 0:
                     local_power = 1e-15
             else:
                 local_power = 1
         else:
-            if whitening:
+            if whitening and h < 1:
                 convolution(power, coefficients.scaling_function, s=s, output=local_power)
                 local_power[local_power <= 0] = 1e-15
                 np.sqrt(local_power, out=local_power)
