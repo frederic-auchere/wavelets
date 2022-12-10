@@ -312,7 +312,7 @@ class AtrousTransform:
         if arr.ndim > 3:
             raise ValueError("Unsupported number of dimensions")
 
-        if arr.dtype is np.int32 or arr.dtype is np.int64 or arr.dtype == '>f4':
+        if arr.dtype is np.int32 or arr.dtype is np.int64 or arr.dtype == '>f4' or arr.dtype == '>f8':
             arr = np.float64(arr)
 
         scaling_function = self.scaling_function_class(arr.ndim)
