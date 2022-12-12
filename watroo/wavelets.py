@@ -366,10 +366,10 @@ class AtrousTransform:
 
             out_slc = slice(s+1, s+2, 1), *[slice(o, None, 2**s) for o in offsets]
             if self.bilateral is None:
-                convolution(conv, kernel, output=conv)
+                convolution(conv, scaling_function, output=conv)
                 coeffs[out_slc] = conv
             else:
-                variance = sdev_loc(conv, kernel, variance=True)*sigma_bilateral[s]**2
+                variance = sdev_loc(conv, scaling_function, variance=True) * sigma_bilateral[s] ** 2
                 if self.bilateral_scaling:
                     variance *= s+1
                 atrous_convolution(conv, kernel, bilateral_variance=variance, mode='symmetric', output=coeffs[out_slc])
