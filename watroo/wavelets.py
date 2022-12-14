@@ -129,8 +129,8 @@ class Coefficients:
         if sigma != 0:
             if self.noise is None:
                 self.noise = self.get_noise()
-                if self.noise == 0:
-                    return np.ones_like(self.data[0])
+            if self.noise == 0:
+                return np.ones_like(self.data[0])
             if soft_threshold:
                 r = np.abs(self.data[scale] / (sigma * self.noise * self.sigma_e[scale]))
                 return special.erf(r)
