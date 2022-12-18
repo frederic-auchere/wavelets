@@ -96,7 +96,8 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
             shifted[:] = padded[slc]
             ne.evaluate('k*exp(-((image - shifted)**2)/bilateral_variance/2)', out=weight)
             norm += weight
-            output += shifted*weight
+            shifted *= weight
+            output += shifted
 
     if bilateral_variance is not None:
         output /= norm
@@ -220,7 +221,7 @@ class AbstractScalingFunction:
         transform = AtrousTransform(self.__class__, bilateral=bilateral)
         std = np.zeros(n_scales)
         for i in tqdm(range(n_trials)):
-            data = np.random.normal(size=(2**n_scales,)*self.n_dim).astype(np.float32)
+            data = np.random.normal(size=(len(self.sigma_e_1d)*2**n_scales,)*self.n_dim).astype(np.float32)
             coefficients = transform(data, n_scales)
             std += coefficients.data[:-1].std(axis=tuple(range(1, self.n_dim+1)))
         std /= n_trials
