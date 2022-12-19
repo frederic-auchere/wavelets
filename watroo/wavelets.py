@@ -6,6 +6,7 @@ from scipy.ndimage import convolve
 import numexpr as ne
 from tqdm import tqdm
 from itertools import product
+import threading
 
 
 __all__ = ['AtrousTransform', 'B3spline', 'Triangle', 'Coefficients', 'generalized_anscombe', 'convolution']
@@ -30,7 +31,6 @@ def sdev_loc(image, scaling_function, s=0, variance=False):
         return vari
     else:
         return np.sqrt(vari)
-
 
 def convolution(arr, scaling_function, s=0, output=None):
     if output is None:
@@ -70,6 +70,30 @@ def convolution(arr, scaling_function, s=0, output=None):
 
     return output
 
+def plus_egal_prod(res, tab1, tab2):
+    # res += ta1*tab2 on several thread
+    # split on first dim is sligthly faster, no explaination
+    nbt = 8;
+    chunk_size = res.shape[0]//nbt;
+    threads = list()
+
+    def thread_f(res, tab1, tab2):
+        tab1 *= tab2
+        res += tab1
+
+    for i in range(0,nbt):
+        # split last dim
+        s = i*chunk_size
+        e = s+chunk_size
+        if e > res.shape[0]:
+            e = res.shape[0]
+        x = threading.Thread(target=thread_f, args=(res[s:e,:,:],tab1[s:e,:,:],tab2[s:e,:,:]))
+        threads.append(x)
+        x.start()
+
+    for thread in threads:
+        thread.join()
+
 
 def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmetric", output=None):
 
@@ -86,9 +110,11 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
 
     mask = np.ones(kernel.shape, dtype=bool)
     mask[half_widths] = False
+
     indices = np.meshgrid(*[np.linspace(shape-1, 0, shape, dtype=int)*2**s for shape in kernel.shape], indexing='ij')
 
     for *deltas, k in zip(*[index[mask] for index in indices], kernel[mask]):
+
         slc = tuple([slice(d, d+s) for d, s in zip(deltas, image.shape)])
         if bilateral_variance is None:
             output += padded[slc]*k
@@ -96,8 +122,11 @@ def atrous_convolution(image, kernel, bilateral_variance=None, s=0, mode="symmet
             shifted[:] = padded[slc]
             ne.evaluate('k*exp(-((image - shifted)**2)/bilateral_variance/2)', out=weight)
             norm += weight
-            shifted *= weight
-            output += shifted
+            if output.ndim == 3:
+                plus_egal_prod(output,shifted,weight)
+            else:
+                shifted *= weight
+                output += shifted
 
     if bilateral_variance is not None:
         output /= norm
