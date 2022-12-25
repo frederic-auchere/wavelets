@@ -79,7 +79,7 @@ def enhance(*args, weights=None, denoise=None, soft_threshold=True, out=None, **
     return out
 
 
-def denoise(data, scaling_function, weights, noise=None, bilateral=None, soft_threshold=True, anscombe=False):
+def denoise(data, weights, scaling_function=B3spline, noise=None, bilateral=None, soft_threshold=True, anscombe=False):
     """
     Convenience function to denoise a data array
     :param data: ndarray-like, the data to denoise
