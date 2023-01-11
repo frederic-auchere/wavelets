@@ -294,6 +294,8 @@ class AtrousTransform:
     Astronomical Data Analysis, Springer-Verlag
     """""
 
+    _recasting_types = [np.int32, np.int64, '>f4', '>f8', 'int16', 'uint16', 'int32', 'uint32']
+
     def __init__(self, scaling_function_class=B3spline, bilateral=None, bilateral_scaling=False):
         """
         scaling_function: the base scaling function. The default is a b3spline.
@@ -314,7 +316,7 @@ class AtrousTransform:
         if arr.ndim > 3:
             raise ValueError("Unsupported number of dimensions")
 
-        if arr.dtype is np.int32 or arr.dtype is np.int64 or arr.dtype == '>f4' or arr.dtype == '>f8':
+        if arr.dtype in self._recasting_types:
             arr = np.float64(arr)
 
         scaling_function = self.scaling_function_class(arr.ndim)
