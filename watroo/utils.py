@@ -120,7 +120,7 @@ def wow(data,
     if type(data) is np.ndarray:  # input is an image
         max_scales = int(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d)))
         if n_scales is None:
-            n_scales = max_scales
+            n_scales = max_scales if h < 1 else len(denoise_coefficients)
         elif n_scales > max_scales:
             n_scales = max_scales
         n_dims = data.ndim
