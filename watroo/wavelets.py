@@ -1,5 +1,5 @@
 import copy
-from cv2 import cv2
+import cv2
 import numpy as np
 from scipy import special
 from scipy.ndimage import convolve
