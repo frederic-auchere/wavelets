@@ -67,7 +67,7 @@ from watroo import Triangle, denoise
 
 img = np.random.normal(size=(512, 512))
 denoise_sigma = [5, 3]
-denoised = denoise(img, Triangle, denoise_sigma)
+denoised = denoise(img, denoise_sigma, Triangle)
 ```
 
 ### Extract significant coefficients at a given scale
@@ -118,4 +118,4 @@ wow_image, _ = wow(image, bilateral=1, denoise_coefficients=[5, 2])
 ## References
 
 * Starck, J.-L. & Murtagh, F. 2002, Handbook of Astronomical Data Analysis, Springer-Verlag, doi:[10.1007/978-3-540-33025-7](https://doi.org/10.1007/978-3-540-33025-7)
-* Auchère, F., Soubrié, E., Pelouze, G., Buchlin, É. 2022, Image Enhancement With Wavelets Optimized Whitening, submitted to A&A
+* Auchère, F., Soubrié, E., Pelouze, G., Buchlin, É. 2022, Image Enhancement With Wavelets Optimized Whitening, A&A, 670, id.A66, doi:[10.1051/0004-6361/202245345](https://ui.adsabs.harvard.edu/link_gateway/2023A&A...670A..66A/doi:10.1051/0004-6361/202245345)
