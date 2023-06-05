@@ -126,8 +126,8 @@ def wow(data,
         n_dims = data.ndim
     elif type(data) is Coefficients:  # input is already computed coefficients
         n_scales = len(data)-1
-        n_dims = data[0].ndim
-        scaling_function = data.scaling_function
+        n_dims = data.data[0].ndim
+        scaling_function = data.scaling_function.__class__
     else:
         raise ValueError('Unknown input type')
 
