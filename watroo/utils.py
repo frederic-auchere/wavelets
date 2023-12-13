@@ -4,7 +4,7 @@ import numpy as np
 import warnings
 from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe, convolution
 
-__all__ = ['denoise', 'wow']
+__all__ = ['denoise', 'wow', 'richardson_lucy']
 
 
 def prepare_params(param, ndims):
