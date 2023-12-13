@@ -15,19 +15,7 @@ Implements the _à trous_ wavelet transform and associated tools: denoising, enh
 Within the active environment
 
 ```sh
-python setup.py install
-```
-
-or
-
-```sh
 pip install .
-```
-
-or if you want to be able to edit & develop (requires reloading the package)
-
-```sh
-pip install -e .
 ```
 
 ## _À trous_ transform

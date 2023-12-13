@@ -1,6 +1,25 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
-]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "watroo"
+version = "0.0.2"
+authors = [
+  { name="Frederic Auchere", email="frederic.auchere@gmail.com" },
+]
+description = "A trous wavelet transform and utilities"
+readme = "README.md"
+dynamic = ["dependencies"]
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[project.urls]
+Homepage = "https://git.ias.u-psud.fr/fauchere/wavelets"
