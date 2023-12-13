@@ -1,4 +1,5 @@
 import copy
+import cv2
 import numpy as np
 import warnings
 from . import AtrousTransform, B3spline, Coefficients, generalized_anscombe, convolution
@@ -104,9 +105,9 @@ def denoise(data, weights, scaling_function=B3spline, noise=None, bilateral=None
 def wow(data,
         scaling_function=B3spline,
         n_scales=None,
-        weights=[],
+        weights=(),
         whitening=True,
-        denoise_coefficients=[],
+        denoise_coefficients=(),
         noise=None,
         bilateral=None,
         bilateral_scaling=False,
@@ -216,3 +217,61 @@ def wow(data,
         recon = (1 - h)*recon + h*gamma_scaled
 
     return recon, coefficients
+
+
+def richardson_lucy(data, psf,
+                    iterations=10, denoise_coefficients=(5, 2, 1),
+                    threshold_type='soft', uniform_init=False, persistent_mrs=True):
+
+    conv = np.empty_like(data)
+    phi = np.empty_like(data)
+
+    transform = AtrousTransform()
+    coefficients = transform(data, len(denoise_coefficients))
+
+    if uniform_init:
+        psi = np.ones_like(data, np.float32)
+        psi *= data.sum() / data.size
+    else:
+        coefficients.denoise(denoise_coefficients, soft_threshold=threshold_type == 'soft')
+        psi = np.sum(coefficients, axis=0)
+
+    level = len(denoise_coefficients)
+    if threshold_type == 'hard':
+        mrs = np.zeros((level, data.shape[0], data.shape[1]))
+    else:
+        mrs = np.ones((level, data.shape[0], data.shape[1]))
+
+    for iteration in range(iterations):
+        # cv2 computes the correlation, not convolution, need to flip the PSF
+        cv2.filter2D(psi, -1, psf[::-1, ::-1], phi, (-1, -1), 0, cv2.BORDER_REFLECT)
+
+        res = data - phi
+
+        res_coefficients = transform(res, len(denoise_coefficients))
+        res_coefficients.noise = coefficients.noise
+        for s, c in enumerate(denoise_coefficients):
+            significance = res_coefficients.significance(c, s, soft_threshold=threshold_type == 'soft')
+            if threshold_type == 'hard':
+                if persistent_mrs:
+                    mrs[s][significance] = 1
+                else:
+                    mrs[s] = significance
+                res_coefficients.data[s] *= mrs[s]
+            else:
+                if persistent_mrs:
+                    mrs[s] *= significance
+                else:
+                    mrs[s] = significance
+                res_coefficients.data[s] *= mrs[s] ** (1 / (iteration + 1))
+
+        np.sum(res_coefficients, axis=0, out=res)
+
+        res += phi
+        res /= phi
+
+        cv2.filter2D(res, -1, psf[::1, ::1], conv, (-1, -1), 0, cv2.BORDER_REFLECT)
+
+        psi *= conv
+
+    return psi
