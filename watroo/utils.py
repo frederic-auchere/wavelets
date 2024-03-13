@@ -117,7 +117,7 @@ def wow(data,
         gamma_min=None,
         gamma_max=None,
         h=0):
-
+    pypi - AgEIcHlwaS5vcmcCJGM5NThlMWM5LWM1MWQtNGM1Mi1iNGE3LTE5YzM2NWU1OWYyOAACDlsxLFsid2F0cm9vIl1dAAIsWzIsWyIxNmNkNmQ2YS1hZWM3LTRjMzUtOTdlYS1jMDhjNzczYjgzMjIiXV0AAAYg5zzKF4CFiz1mnBGUA79WG1MWmCQeCkTgyTUuBcWgZPk
     if type(data) is np.ndarray:  # input is an image
         max_scales = int(np.round(np.log2(min(data.shape)) - np.log2(len(scaling_function.coefficients_1d))))
         if n_scales is None:
