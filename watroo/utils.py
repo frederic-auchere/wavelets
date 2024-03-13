@@ -105,9 +105,9 @@ def denoise(data, weights, scaling_function=B3spline, noise=None, bilateral=None
 def wow(data,
         scaling_function=B3spline,
         n_scales=None,
-        weights=(),
+        weights=[],
         whitening=True,
-        denoise_coefficients=(),
+        denoise_coefficients=[],
         noise=None,
         bilateral=None,
         bilateral_scaling=False,
@@ -221,7 +221,7 @@ def wow(data,
 
 def richardson_lucy(data, psf,
                     iterations=10, denoise_coefficients=(5, 2, 1),
-                    threshold_type='soft', uniform_init=False, persistent_mrs=True):
+                    threshold_type='soft', uniform_init=False, persistent_mrs=True, fft=False):
 
     conv = np.empty_like(data)
     phi = np.empty_like(data)
@@ -242,9 +242,19 @@ def richardson_lucy(data, psf,
     else:
         mrs = np.ones((level, data.shape[0], data.shape[1]))
 
+    if fft:
+        padded_psf = np.zeros_like(psi)
+        padded_psf[psi.shape[0] // 2 - psf.shape[0] // 2:psi.shape[0] // 2 - psf.shape[0] // 2 + psf.shape[0],
+                   psi.shape[1] // 2 - psf.shape[1] // 2:psi.shape[1] // 2 - psf.shape[1] // 2 + psf.shape[1]] = psf
+        fft_psf = np.fft.rfft2(np.roll(padded_psf, (padded_psf.shape[0] // 2, padded_psf.shape[1] // 2), axis=(0, 1)))
+        psf_conj = fft_psf.conj()
+
     for iteration in range(iterations):
-        # cv2 computes the correlation, not convolution, need to flip the PSF
-        cv2.filter2D(psi, -1, psf[::-1, ::-1], phi, (-1, -1), 0, cv2.BORDER_REFLECT)
+        if fft:
+            phi = np.fft.irfft2(np.fft.rfft2(psi) * fft_psf)
+        else:
+            # cv2 computes the correlation, not convolution, need to flip the PSF
+            cv2.filter2D(psi, -1, psf[::-1, ::-1], phi, (-1, -1), 0, cv2.BORDER_REFLECT)
 
         res = data - phi
 
@@ -270,7 +280,10 @@ def richardson_lucy(data, psf,
         res += phi
         res /= phi
 
-        cv2.filter2D(res, -1, psf[::1, ::1], conv, (-1, -1), 0, cv2.BORDER_REFLECT)
+        if fft:
+            conv = np.fft.irfft2(np.fft.rfft2(res) * psf_conj)
+        else:
+            cv2.filter2D(res, -1, psf[::1, ::1], conv, (-1, -1), 0, cv2.BORDER_REFLECT)
 
         psi *= conv
 
