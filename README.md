@@ -2,6 +2,8 @@
 
 Implements the _à trous_ wavelet transform and associated tools: denoising, enhancement, etc.
 
+<a href="https://pypi.org/project/watroo"><img alt="Latest version" src="https://badge.fury.io/py/watroo.svg"></a>
+
 # Contents
 
 [Installation](#installation)\
